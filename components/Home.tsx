@@ -1,0 +1,409 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { catIcon, catName } from "@/lib/categories";
+import { brl, brl0, daysInMonth, monthName, shiftMonth } from "@/lib/format";
+import { computeScenarios } from "@/lib/projections";
+import { byCategory, cumulative, envelopes, ofMonth, variableSpend } from "@/lib/stats";
+import { billPaid, categoryTable, priceChanges, recurringSuggestions, safeToSpend } from "@/lib/insights";
+import { saveBackup } from "@/lib/backup";
+import { billActive, cardDebt, cdbNet, receivablesOpen, cdbPerDay, dismissRecurring, fatherBalance, monthKey, myMoney, parcela, projectionInput, toggleBillPaid, update, useData } from "@/lib/store";
+import type { Data, Tx } from "@/lib/types";
+import { CategoryBars, CategoryDonut, CumulativeChart, type CatDatum } from "./charts";
+import { TxList, TxRow, TxSheet } from "./Tx";
+import Revisar from "./Revisar";
+import { ReceberCard } from "./Receber";
+import { act, Button, Card, Icons, Money, MonthSwitcher, Progress, Section, Sheet, toast } from "./ui";
+
+export default function Home({ month, setMonth, hidden, setHidden, goExtrato, goMeta, goCdb }: {
+  month: string; setMonth: (m: string) => void; hidden: boolean; setHidden: (h: boolean) => void;
+  goExtrato: () => void; goMeta: () => void; goCdb: () => void;
+}) {
+  const d = useData();
+  const customs = d.config.customCats;
+  const [cat, setCat] = useState<string | null>(null);
+  const [open, setOpen] = useState<Tx | null>(null);
+  const [todas, setTodas] = useState(false);
+  const [revisar, setRevisar] = useState(false);
+
+  const pai = fatherBalance(d);
+  const account = d.config.accountBalance;
+  const meu = myMoney(d);
+  const teto = useMemo(() => Math.max(0, computeScenarios(projectionInput(d))[0].monthlyVariable), [d]);
+  const monthTxs = ofMonth(d.txs, month);
+  const spent = variableSpend(monthTxs);
+  const prev = shiftMonth(month, -1);
+  const prevSpent = variableSpend(ofMonth(d.txs, prev));
+  const isNow = month === monthKey();
+  const daysLeft = isNow ? daysInMonth(month) - new Date().getDate() + 1 : 0;
+  const review = d.txs.filter((t) => t.review).length;
+  const staleDays = d.config.balanceDate ? Math.floor((Date.now() - Date.parse(d.config.balanceDate)) / 86400000) : null;
+  const perDay = cdbPerDay(d);
+  const cdb = cdbNet(d);
+  const goalPct = Math.min(100, Math.round((meu / (d.config.goalAmount || 1)) * 100));
+
+  // Top 5 categorias + "Outros", para as barras e a rosca.
+  const cats: CatDatum[] = useMemo(() => {
+    const all = byCategory(monthTxs).map((c) => ({ key: c.key, name: catName(c.key, customs), icon: catIcon(c.key, customs), value: Math.round(c.value) }));
+    if (all.length <= 6) return all;
+    const rest = all.slice(5).reduce((s, c) => s + c.value, 0);
+    return [...all.slice(0, 5), { key: "__outros", name: "Outros", icon: "•••", value: Math.round(rest) }];
+  }, [monthTxs, customs]);
+
+  const tabela = useMemo(() => categoryTable(d.txs, month), [d.txs, month]);
+  const abrirCat = (k: string) => (k === "__outros" ? setTodas(true) : setCat(k));
+  const livre = isNow ? safeToSpend(d, teto) : null;
+  const backupDias = d.lastBackup ? Math.floor((Date.now() - Date.parse(d.lastBackup)) / 86400000) : null;
+  const alertas = isNow ? envelopes(d, month, teto).filter((e) => e.budget > 0 && e.spent >= e.budget * (d.config.prefs.alertPct / 100)) : [];
+
+  const recent = [...d.txs].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 5);
+  const spentDiff = prevSpent ? Math.round(((spent - prevSpent) / prevSpent) * 100) : null;
+
+  return (
+    <div>
+      {/* Saudação e saldo, centralizados, como na referência */}
+      <header className="flex items-center justify-between pt-4 pb-3">
+        <h1 className="text-[26px] font-extrabold leading-tight">
+          Bem-vindo de volta,<br />{d.config.prefs.name || "você"}! <span aria-hidden>👋</span>
+        </h1>
+        <span className="w-11 h-11 shrink-0 rounded-full bg-brand text-onbrand grid place-items-center font-bold">{(d.config.prefs.name || "?").slice(0, 2).toUpperCase()}</span>
+      </header>
+
+      {(backupDias === null || backupDias > d.config.prefs.backupDays) && d.txs.length > 0 && (
+        <Card className="mb-3 flex items-center gap-3 !py-3">
+          <span className="text-xl" aria-hidden>💾</span>
+          <span className="flex-1 text-[14px]">
+            <span className="block font-semibold">{backupDias === null ? "Você nunca salvou backup" : `Último backup há ${backupDias} dias`}</span>
+            <span className="block text-ink3">Se o iPhone apagar o app, tudo some.</span>
+          </span>
+          <Button tone="primary" className="!h-9 !px-3 text-[14px]" onClick={async () => (await saveBackup()) && toast("Backup salvo")}>Salvar</Button>
+        </Card>
+      )}
+
+      <div className="hero card p-5 text-center">
+        <div className="flex items-center justify-center gap-2 text-white/70 text-[14px]">
+          Meu dinheiro
+          <button aria-label={hidden ? "Mostrar valores" : "Esconder valores"} onClick={() => setHidden(!hidden)} className="text-white/70">
+            {hidden ? Icons.eyeOff : Icons.eye}
+          </button>
+        </div>
+        <Money v={meu} className="block text-[40px] leading-tight font-extrabold" />
+        <div className="text-[13px] text-white/70">
+          {staleDays === null ? "Importe um extrato para começar"
+            : `Saldo do extrato de ${new Date(d.config.balanceDate + "T12:00:00").toLocaleDateString("pt-BR")}`}
+          {staleDays !== null && staleDays > 7 ? " ⚠︎" : ""}
+        </div>
+
+        {cardDebt(d) > 0 && (
+          <div className="text-[13px] text-white/80 mt-1">
+            já descontada a fatura do cartão em aberto: −<Money v={cardDebt(d)} />
+          </div>
+        )}
+
+        {d.config.prefs.countReceivables && receivablesOpen(d) > 0 && (
+          <div className="text-[13px] text-white/80">
+            inclui <Money v={receivablesOpen(d)} /> que te devem
+          </div>
+        )}
+
+        {/* A conta fatiada: quanto ali é seu e quanto é do pai */}
+        <SplitBar account={account} pai={pai} />
+
+        <div className="grid grid-cols-2 gap-3 mt-4 text-left">
+          <div className="rounded-xl bg-white/10 p-3">
+            <div className="text-[12px] text-white/70">Na conta é seu</div>
+            <Money v={pai < 0 ? account : account - pai} className="font-bold" />
+          </div>
+          <button onClick={goCdb} className="rounded-xl bg-white/10 p-3 text-left block w-full">
+            <div className="text-[12px] text-white/70">CDB {d.config.cdb.pctCdi ? `· ${d.config.cdb.pctCdi}% CDI` : ""}</div>
+            <Money v={cdb.bruto} className="font-bold" />
+            {cdb.ir > 0 && (
+              <div className="text-[12px] text-white/70">
+                líquido <Money v={cdb.liquido} /> <span className="whitespace-nowrap">(IR {cdb.aliquota.toLocaleString("pt-BR")}%)</span>
+              </div>
+            )}
+            {perDay > 0 && (
+              <div className="text-[12px] text-white/70">
+                rende <Money v={perDay} />/dia útil
+              </div>
+            )}
+            {d.config.rendaFixaDate && cdb.bruto > d.config.rendaFixa && (
+              <div className="text-[12px] text-white/70">
+                +<Money v={cdb.bruto - d.config.rendaFixa} /> desde {d.config.rendaFixaDate.slice(8, 10)}/{d.config.rendaFixaDate.slice(5, 7)}
+              </div>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mt-6 mb-2 px-1">
+        <h2 className="text-[20px] font-semibold">No mês</h2>
+        <MonthSwitcher month={month} onChange={setMonth} max={monthKey()} />
+      </div>
+
+      <Card>
+        <div className="flex items-baseline justify-between">
+          <span className="text-ink2 text-[15px]">Gasto variável</span>
+          <span className="text-ink3 text-[13px]">teto {hidden ? "••••" : brl0(teto)}</span>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <Money v={spent} className="text-[28px] font-extrabold" />
+          {spentDiff !== null && !hidden && (
+            <span className={`text-[13px] font-semibold ${spentDiff > 0 ? "text-alert" : "text-ok"}`}>
+              {spentDiff > 0 ? "▲" : "▼"} {Math.abs(spentDiff)}% vs {monthName(prev).toLowerCase()}
+            </span>
+          )}
+        </div>
+        <div className="mt-2"><Progress value={spent} max={teto} /></div>
+        <div className={`text-[13px] mt-2 ${spent > teto ? "text-alert font-medium" : "text-ink2"}`}>
+          {spent > teto
+            ? <>⚠︎ Passou do teto em <Money v={spent - teto} /></>
+            : isNow
+              ? <>Sobram <Money v={teto - spent} /> do teto · {daysLeft} dia{daysLeft === 1 ? "" : "s"} até o fim do mês</>
+              : <>Ficou <Money v={teto - spent} /> abaixo do teto</>}
+        </div>
+      </Card>
+
+      {livre && (
+        <Card className="mt-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-ink2 text-[15px]">Dá para gastar hoje</span>
+            <span className="text-ink3 text-[13px]">até <Money v={livre.livre} /> no mês</span>
+          </div>
+          <Money v={livre.porDia} className="block text-[28px] font-extrabold text-ok" />
+          <div className="text-[13px] text-ink2">
+            {livre.pelaConta
+              ? <>Limitado pelo que tem na conta{livre.aPagar ? <>, já separando <Money v={livre.aPagar} /> de contas e parcelas</> : ""}.</>
+              : livre.aPagar
+                ? <>Contas e parcelas a pagar (<Money v={livre.aPagar} />) já estão separadas.</>
+                : "Cabe no teto e na conta."}
+          </div>
+          {staleDays !== null && staleDays > 7 && (
+            <div className="text-[13px] text-alert mt-1">⚠︎ O último extrato é de {staleDays} dias atrás: importe o novo para esse número valer.</div>
+          )}
+        </Card>
+      )}
+
+      <ReceberCard />
+
+      {alertas.length > 0 && (
+        <Card className="mt-3" onClick={goMeta}>
+          <div className="text-[15px] font-semibold mb-2">Envelopes no limite</div>
+          {alertas.map((e) => {
+            const pct = Math.round((e.spent / e.budget) * 100);
+            return (
+              <div key={e.id} className="mb-2">
+                <div className="flex justify-between text-[14px] mb-1">
+                  <span>{e.label}</span>
+                  <span className={pct >= 100 ? "text-alert font-semibold" : "text-ink2"}>{pct >= 100 ? "⚠︎ " : ""}{pct}%</span>
+                </div>
+                <Progress value={e.spent} max={e.budget} />
+              </div>
+            );
+          })}
+          <div className="text-[13px] text-link font-semibold">Remanejar em Meta ›</div>
+        </Card>
+      )}
+
+      {cats.length > 0 && (
+        <>
+          <Section>Gasto por categoria</Section>
+          <Card>
+            <CategoryBars data={cats} onSelect={abrirCat} />
+            <CatRows rows={tabela.slice(0, 5)} customs={customs} hidden={hidden} onOpen={setCat} />
+            {tabela.length > 5 && (
+              <button onClick={() => setTodas(true)} className="w-full text-link font-semibold text-[15px] pt-2">
+                Ver todas as {tabela.length} categorias ›
+              </button>
+            )}
+          </Card>
+
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <Card>
+              <div className="text-[15px] font-semibold mb-1">Distribuição</div>
+              <CategoryDonut data={cats} onSelect={abrirCat} />
+            </Card>
+            <Card>
+              <div className="text-[15px] font-semibold mb-3">Metas</div>
+              <Goal label="Meta de dezembro" pct={goalPct} color="var(--meta)" />
+              <Goal label="Teto do mês" pct={teto ? Math.min(100, Math.round((spent / teto) * 100)) : 0} color="var(--meu)" over={spent > teto} />
+              <div className="text-[13px] text-ink3 mt-3">
+                Faltam <Money v={Math.max(0, d.config.goalAmount - meu)} /> para a meta.
+              </div>
+            </Card>
+          </div>
+        </>
+      )}
+
+      {review > 0 && (
+        <Card className="mt-3 flex items-center gap-3" onClick={() => setRevisar(true)}>
+          <span className="w-10 h-10 rounded-full bg-fill grid place-items-center text-lg" aria-hidden>❔</span>
+          <span className="flex-1">
+            <span className="block font-semibold">{review} para revisar</span>
+            <span className="block text-[13px] text-ink3">Uma por vez, arrastando. O app aprende.</span>
+          </span>
+          <span className="text-ink3 text-xl" aria-hidden>›</span>
+        </Card>
+      )}
+
+      <Section action={<button onClick={goExtrato} className="text-link text-[15px] font-semibold">Ver tudo</button>}>
+        Últimas transações
+      </Section>
+      {recent.length ? (
+        <div className="card px-4">
+          {recent.map((t) => <TxRow key={t.id} t={t} onOpen={setOpen} />)}
+        </div>
+      ) : (
+        <Card className="text-ink2">Nada lançado ainda. Use o + ou importe o extrato em Mais.</Card>
+      )}
+
+      <Section>Gasto acumulado</Section>
+      <Card>
+        <CumulativeChart data={cumulative(d.txs, month, prev, isNow)} teto={teto} labels={[monthName(month), monthName(prev)]} />
+      </Card>
+
+      <FixedBills d={d} month={month} />
+      {isNow && <Sugestoes d={d} />}
+
+      <Sheet open={!!cat} onClose={() => setCat(null)} title={cat ? `${catName(cat, customs)} · ${monthName(month)}` : ""}>
+        {cat && <TxList txs={monthTxs.filter((t) => t.category === cat && t.amount < 0)} onOpen={(t) => { setCat(null); setOpen(t); }} />}
+      </Sheet>
+      <Sheet open={todas} onClose={() => setTodas(false)} title={`Categorias · ${monthName(month)}`}>
+        <div className="card px-4">
+          <CatRows rows={tabela} customs={customs} hidden={hidden} onOpen={(k) => { setTodas(false); setCat(k); }} />
+        </div>
+        <p className="text-[13px] text-ink3 mt-2 px-1">Toque numa categoria para ver o que tem nela e reclassificar.</p>
+      </Sheet>
+      <TxSheet tx={open} onClose={() => setOpen(null)} />
+      {revisar && <Revisar onClose={() => setRevisar(false)} />}
+    </div>
+  );
+}
+
+/** Linhas de categoria: valor e comparação com o mês anterior. */
+function CatRows({ rows, customs, hidden, onOpen }: {
+  rows: { key: string; value: number; prev: number }[]; customs: Data["config"]["customCats"]; hidden: boolean; onOpen: (k: string) => void;
+}) {
+  return (
+    <div className="divide-y divide-line">
+      {rows.map((c) => {
+        const diff = c.prev ? Math.round(((c.value - c.prev) / c.prev) * 100) : null;
+        return (
+          <button key={c.key} onClick={() => onOpen(c.key)} className="w-full flex items-center gap-3 py-2.5 text-left">
+            <span className="w-9 h-9 shrink-0 rounded-full bg-fill grid place-items-center" aria-hidden>{catIcon(c.key, customs)}</span>
+            <span className="flex-1 min-w-0">
+              <span className="block truncate">{catName(c.key, customs)}</span>
+              <span className={`block text-[12px] ${diff !== null && diff > 0 ? "text-alert" : "text-ink3"}`}>
+                {hidden ? "" : diff === null ? "novo este mês" : diff === 0 ? "igual ao mês passado" : `${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)}% vs mês passado`}
+              </span>
+            </span>
+            <Money v={c.value} className="shrink-0" />
+            <span className="text-ink3" aria-hidden>›</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** "Parece conta fixa" e "sua assinatura mudou de preço": um toque resolve. */
+function Sugestoes({ d }: { d: Data }) {
+  const rec = recurringSuggestions(d).slice(0, 3);
+  const mudou = priceChanges(d);
+  if (!rec.length && !mudou.length) return null;
+  return (
+    <>
+      <Section>Sugestões</Section>
+      <div className="flex flex-col gap-2">
+        {mudou.map(({ bill, novo }) => (
+          <Card key={bill.id} className="!py-3">
+            <div className="text-[15px]"><b>{bill.name}</b> veio {novo > bill.amount ? "mais caro" : "mais barato"}: {brl(bill.amount)} → {brl(novo)}</div>
+            <Button className="mt-2 w-full !h-9" onClick={() => act(`${bill.name} atualizada`, (dd) => ({
+              ...dd, config: { ...dd.config, bills: dd.config.bills.map((b) => (b.id === bill.id ? { ...b, amount: novo } : b)) },
+            }))}>Atualizar para {brl(novo)}</Button>
+          </Card>
+        ))}
+        {rec.map((r) => (
+          <Card key={r.key} className="!py-3">
+            <div className="text-[15px]"><b>{r.name}</b> aparece todo mês (~{brl(r.amount)}, dia {r.day}). É conta fixa?</div>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <Button className="!h-9" onClick={() => act("Não sugiro mais", (dd) => dismissRecurring(dd, r.key))}>Não é</Button>
+              <Button tone="primary" className="!h-9" onClick={() => act(`${r.name} virou conta fixa`, (dd) => ({
+                ...dd, config: { ...dd.config, bills: [...dd.config.bills, { id: Math.random().toString(36).slice(2), name: r.name, amount: r.amount, match: r.key, atSource: false }] },
+              }))}>Adicionar</Button>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function Goal({ label, pct, color, over }: { label: string; pct: number; color: string; over?: boolean }) {
+  return (
+    <div className="mb-3">
+      <div className="flex justify-between text-[13px] mb-1">
+        <span className="text-ink2 truncate">{label}</span>
+        <span className={over ? "text-alert font-semibold" : "text-ink3"}>{pct}%</span>
+      </div>
+      <Progress value={pct} max={100} color={over ? "var(--alert)" : color} />
+    </div>
+  );
+}
+
+/** A conta inteira como uma barra: parte azul é sua, parte laranja é do pai. */
+function SplitBar({ account, pai }: { account: number; pai: number }) {
+  const owed = pai < 0; // pai te deve: tudo na conta é seu, e ainda tem a receber
+  const total = owed ? account - pai : Math.max(account, 1);
+  const w = (v: number) => `${Math.max(0, Math.min(100, (v / total) * 100))}%`;
+  return (
+    <div className="mt-4">
+      <div className="flex h-2.5 rounded-full overflow-hidden gap-[2px] bg-white/15" aria-hidden>
+        <div style={{ width: w(owed ? account : account - pai), background: "var(--meu)" }} />
+        {owed
+          ? <div style={{ width: w(-pai), background: "repeating-linear-gradient(135deg, var(--pai) 0 4px, transparent 4px 8px)" }} />
+          : <div style={{ width: w(pai), background: "var(--pai)" }} />}
+      </div>
+      <div className="flex justify-between text-[12px] text-white/70 mt-1.5">
+        <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full" style={{ background: "var(--meu)" }} />Seu</span>
+        <span>Conta: <Money v={account} className="text-white" /></span>
+        <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full" style={{ background: "var(--pai)" }} />{owed ? "Pai te deve" : "Do pai"}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Conta fixa fica paga sozinha quando aparece no extrato, ou no toque. */
+function FixedBills({ d, month }: { d: Data; month: string }) {
+  const bills = d.config.bills.filter((b) => billActive(b, month));
+  const marcadas = d.config.billsPaid[month] || [];
+  if (!bills.length) return null;
+  return (
+    <>
+      <Section>{bills.some((b) => b.until) ? "Contas e parcelas" : "Contas fixas"}</Section>
+      <div className="card px-4">
+        {bills.map((b, i) => {
+          const paid = billPaid(d, b, month);
+          const noExtrato = paid && !marcadas.includes(b.id);
+          return (
+            <button key={b.id} onClick={() => update((dd) => toggleBillPaid(dd, month, b.id))}
+              className={`w-full flex items-center gap-3 py-3 text-left ${i ? "border-t border-line" : ""}`}>
+              <span className={`w-6 h-6 shrink-0 rounded-full grid place-items-center text-[13px] ${paid ? "bg-ok text-white" : "border-2 border-line text-transparent"}`} aria-hidden>✓</span>
+              <span className="flex-1 min-w-0">
+                <span className="block truncate">{b.name}</span>
+                {(() => {
+                  const p = parcela(b, month);
+                  const txt = [p && `parcela ${p.n} de ${p.total}`, noExtrato && "apareceu no extrato"].filter(Boolean).join(" · ");
+                  return txt ? <span className="block text-[12px] text-ink3">{txt}</span> : null;
+                })()}
+              </span>
+              <Money v={b.amount} className="text-ink2" />
+              <span className={`text-[13px] w-16 text-right ${paid ? "text-ok" : "text-ink3"}`}>{paid ? "pago" : "a pagar"}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-[13px] text-ink3 px-1 mt-1.5">Toque para marcar ou desmarcar como paga.</p>
+    </>
+  );
+}

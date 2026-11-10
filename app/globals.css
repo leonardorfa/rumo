@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fonte no próprio app: funciona offline, sem pedir nada para a internet. */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/pjs.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+/* Paleta navy: #05183c, #06296b, #1a3c7d, #101217, #0c0d0d.
+   As cores de gráfico saem de uma paleta validada para daltonismo. */
+:root {
+  color-scheme: light;
+  --bg: #f3f6fb;
+  --card: #ffffff;
+  --fill: #e9eef7;
+  --line: #dfe6f1;
+  --ink: #05183c;
+  --ink2: #46566f;
+  --ink3: #7d8aa0;
+  --brand: #06296b;
+  --link: #06296b; /* azul da marca como texto */
+  --on-brand: #ffffff;
+  --meu: #2a78d6;
+  --pai: #eb6834;
+  --ok: #157f52;
+  --alert: #c03a2b;
+  --meta: #a97400;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #4a3aa7; --s5: #e87ba4; --s6: #eda100;
+  --hero: linear-gradient(135deg, #05183c 0%, #06296b 55%, #1a3c7d 100%);
+  --shadow: 0 1px 2px rgba(5, 24, 60, 0.06), 0 8px 24px rgba(5, 24, 60, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0c0d0d;
+    --card: #101217;
+    --fill: #171c28;
+    --line: #202739;
+    --ink: #eaf0fa;
+    --ink2: #9aa8c0;
+    --ink3: #6e7c95;
+    --brand: #1a3c7d;
+    --link: #8db4f2; /* #1a3c7d como texto some no fundo escuro */
+    --on-brand: #ffffff;
+    --meu: #3987e5;
+    --pai: #d95926;
+    --ok: #2fae7a;
+    --alert: #e0705f;
+    --meta: #d9a43a;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #9085e9; --s5: #d55181; --s6: #c98500;
+    --hero: linear-gradient(135deg, #05183c 0%, #06296b 60%, #1a3c7d 100%);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0c0d0d;
+  --card: #101217;
+  --fill: #171c28;
+  --line: #202739;
+  --ink: #eaf0fa;
+  --ink2: #9aa8c0;
+  --ink3: #6e7c95;
+  --brand: #1a3c7d;
+  --link: #8db4f2;
+  --on-brand: #ffffff;
+  --meu: #3987e5;
+  --pai: #d95926;
+  --ok: #2fae7a;
+  --alert: #e0705f;
+  --meta: #d9a43a;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #9085e9; --s5: #d55181; --s6: #c98500;
+  --hero: linear-gradient(135deg, #05183c 0%, #06296b 60%, #1a3c7d 100%);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Plus Jakarta Sans", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+}
+
+.hero {
+  background: var(--hero);
+  color: #fff;
+}
+
+/* Campos: 16px evita o zoom automático do iPhone ao focar. */
+input,
+textarea,
+select {
+  font-size: 16px;
+  background: var(--fill);
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 12px;
+  width: 100%;
+  outline: none;
+}
+input:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--meu);
+  outline-offset: 2px;
+}
+
+.pb-tab {
+  padding-bottom: calc(160px + env(safe-area-inset-bottom)); /* barra de abas + botões flutuantes */
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet-in {
+    animation: sheet-in 0.22s ease-out;
+  }
+  @keyframes sheet-in {
+    from {
+      transform: translateY(24px);
+      opacity: 0;
+    }
+  }
+}

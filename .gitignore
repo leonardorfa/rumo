@@ -1,0 +1,8 @@
+node_modules
+.next
+out
+.check
+next-env.d.ts
+.netlify
+.env*
+*.tsbuildinfo

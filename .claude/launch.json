@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "grana-dev", "runtimeExecutable": "C:\Users\leona\financas-mobile\run-dev.cmd", "runtimeArgs": [], "port": 3100 }
+  ]
+}
