@@ -98,18 +98,35 @@ export function Button({ children, onClick, tone = "fill", className = "", disab
 export function Sheet({ open, onClose, title, children }: {
   open: boolean; onClose: () => void; title: string; children: React.ReactNode;
 }) {
+  // O teclado do iPhone não encolhe a página: a folha ficava por trás dele e escondia o campo.
+  // Acompanha a área realmente visível (visualViewport) e leva o campo focado para o meio.
+  const [vv, setVv] = useState<{ h: number; top: number } | null>(null);
   useEffect(() => {
     if (!open) return;
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", k);
-    return () => window.removeEventListener("keydown", k);
+    const v = window.visualViewport;
+    const sync = () => v && setVv({ h: v.height, top: v.offsetTop });
+    sync();
+    v?.addEventListener("resize", sync);
+    v?.addEventListener("scroll", sync);
+    return () => {
+      window.removeEventListener("keydown", k);
+      v?.removeEventListener("resize", sync);
+      v?.removeEventListener("scroll", sync);
+    };
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal aria-label={title}>
+    <div className="fixed left-0 right-0 z-50 flex items-end justify-center" role="dialog" aria-modal aria-label={title}
+      style={vv ? { top: vv.top, height: vv.h } : { top: 0, bottom: 0 }}
+      onFocusCapture={(e) => {
+        const el = e.target as HTMLElement;
+        if (/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
+      }}>
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="sheet-in relative w-full max-w-[480px] max-h-[88vh] overflow-y-auto bg-bg rounded-t-3xl px-4 pt-2"
-        style={{ paddingBottom: "calc(20px + env(safe-area-inset-bottom))" }}>
+      <div className="sheet-in relative w-full max-w-[480px] overflow-y-auto bg-bg rounded-t-3xl px-4 pt-2"
+        style={{ maxHeight: vv ? `${Math.min(vv.h - 8, vv.h * 0.94)}px` : "88vh", paddingBottom: "calc(20px + env(safe-area-inset-bottom))" }}>
         <div className="mx-auto mt-1 mb-3 h-1.5 w-10 rounded-full bg-line" />
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-[20px] font-semibold">{title}</h2>

@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { classify, detectPassthroughs, normalize } from "./classifier";
 import { catName, typeOf } from "./categories";
-import { DEFAULT_PIN_HASH } from "./lock";
 import { localDay } from "./format";
 import type { ProjectionInput } from "./projections";
 import type { Bill, Config, Data, Envelope, FatherEntry, Invoice, ParsedTransaction, Receivable, Rule, Tx } from "./types";
@@ -9,7 +8,7 @@ import type { Bill, Config, Data, Envelope, FatherEntry, Invoice, ParsedTransact
 const KEY = "financas:v1";
 
 export const DEFAULT_PREFS: Config["prefs"] = {
-  name: "LR", hideOnStart: true, avgMonths: 3, economyPct: 30, areasCount: 6, alertPct: 80, backupDays: 14, payday: 0, countReceivables: true, birth: "", returnPct: 10,
+  name: "", hideOnStart: true, avgMonths: 3, economyPct: 30, areasCount: 6, alertPct: 80, backupDays: 14, payday: 0, countReceivables: true, birth: "", returnPct: 10,
 };
 
 export const DEFAULT_CONFIG: Config = {
@@ -43,7 +42,7 @@ export const DEFAULT_CONFIG: Config = {
   ],
   envelopeOverrides: {},
   billsPaid: {},
-  lock: { on: true, pinHash: DEFAULT_PIN_HASH, credId: "" },
+  lock: { on: false, pinHash: "", credId: "" }, // o PIN é seu: define em Mais, Segurança (e vai no backup)
   dismissedRecurring: [],
   invoices: [],
 };
@@ -101,13 +100,49 @@ export function getData(): Data {
   return cache;
 }
 
+// ---------- proteção dos dados: contador de alterações e estados anteriores ----------
+
+const CHANGES = "rumo-changes";
+const SNAPS = "rumo-snaps";
+const SNAP_EVERY = 20 * 60 * 1000; // um estado anterior a cada 20 min de uso
+const SNAP_KEEP = 6;
+export interface Snap { t: number; tx: number; json: string }
+
+const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
+
+/** Quantas alterações você fez desde o último backup salvo em arquivo. */
+export const changesSinceBackup = () => Number(lsGet(CHANGES) || 0);
+export const resetChanges = () => lsSet(CHANGES, "0");
+
+export function listSnapshots(): Snap[] {
+  try { return JSON.parse(lsGet(SNAPS) || "[]"); } catch { return []; }
+}
+/** Guarda o estado atual como ponto de volta (antes de restaurar, importar ou trocar algo grande). */
+export function snapshotNow(d: Data = getData()) {
+  let list = [{ t: Date.now(), tx: d.txs.length, json: JSON.stringify(d) }, ...listSnapshots()].slice(0, SNAP_KEEP);
+  // se estourar o espaço do aparelho, abre mão dos mais antigos
+  while (list.length && !lsSet(SNAPS, JSON.stringify(list))) list = list.slice(0, -1);
+}
+export function restoreSnapshot(i: number): boolean {
+  const s = listSnapshots()[i];
+  if (!s) return false;
+  snapshotNow(); // voltar também é reversível
+  setData(withDefaults(JSON.parse(s.json)));
+  return true;
+}
+
 export function setData(d: Data) {
+  const antes = cache;
   cache = d;
   try {
     localStorage.setItem(KEY, JSON.stringify(d));
   } catch {
-    alert("Não consegui salvar no aparelho. Faça um backup em Mais → Backup.");
+    alert("Não consegui salvar no aparelho. Faça um backup em Mais → Dados.");
   }
+  lsSet(CHANGES, String(changesSinceBackup() + 1));
+  const ultimo = listSnapshots()[0];
+  if (antes && (!ultimo || Date.now() - ultimo.t > SNAP_EVERY)) snapshotNow(antes);
   listeners.forEach((l) => l());
 }
 
@@ -269,8 +304,24 @@ export const deleteInvoice = (d: Data, id: string): Data => ({
  * do cartão em aberto. Compra no cartão já é dinheiro que saiu: quando a
  * fatura é paga, sai da conta e deixa de contar como dívida.
  */
-export const myMoney = (d: Data) =>
-  d.config.accountBalance - fatherBalance(d) + cdbNet(d).liquido - cardDebt(d) + (d.config.prefs?.countReceivables === false ? 0 : receivablesOpen(d));
+export const myMoney = (d: Data) => moneyParts(d).total;
+
+/**
+ * O "meu dinheiro" aberto em partes.
+ * disponível: o que é seu na conta, menos a fatura do cartão em aberto.
+ * a receber: o que seu pai te deve (crédito dele negativo) e o que outras pessoas te devem.
+ * total: disponível + CDB líquido + a receber.
+ */
+export function moneyParts(d: Data, now = new Date()) {
+  const pai = fatherBalance(d);
+  const fatura = cardDebt(d);
+  const disponivel = r2(d.config.accountBalance - Math.max(0, pai) - fatura);
+  const cdb = cdbNet(d, now).liquido;
+  const doPai = r2(Math.max(0, -pai));
+  const pessoas = d.config.prefs?.countReceivables === false ? 0 : receivablesOpen(d);
+  const aReceber = r2(doPai + pessoas);
+  return { disponivel, cdb, doPai, pessoas, aReceber, fatura, conta: d.config.accountBalance, total: r2(disponivel + cdb + aReceber) };
+}
 
 // ---------- a receber (quem te deve) ----------
 
@@ -412,15 +463,19 @@ export function importParsed(
   // some com os lançamentos manuais para não contar duas vezes.
   const kept = d.txs.filter((t) => !(t.manual && t.date >= firstTx && t.date <= stmtDate));
   const replacedManual = d.txs.length - kept.length;
-  // Extrato mais antigo que o saldo que já temos só entra como histórico:
-  // o saldo atual já contém essas transações.
-  const newer = !cfg.balanceDate || stmtDate >= cfg.balanceDate;
+  // Extrato mais antigo que o último extrato que já temos só entra como histórico.
+  // (Lançamento seu de hoje move o balanceDate, mas não é extrato: não pode travar o saldo.)
+  const ultimoExtrato = cfg.stmtDate || d.txs.filter((t) => !t.manual && !t.card).reduce((m, t) => (t.date > m ? t.date : m), "");
+  const newer = !ultimoExtrato || stmtDate >= ultimoExtrato;
   const after = txs.filter((t) => !cfg.balanceDate || t.date > cfg.balanceDate);
   const closingApplied = closingBalance !== null && newer;
   if (closingApplied) {
     // Fonte da verdade: o "Saldo do dia" do extrato.
-    cfg.accountBalance = r2(closingBalance!);
+    // + o que você lançou na mão depois da data do extrato, que o banco ainda não mostra.
+    const depois = kept.filter((t) => t.manual && !t.card && t.date > stmtDate).reduce((s, t) => s + t.amount, 0);
+    cfg.accountBalance = r2(closingBalance! + depois);
     cfg.balanceDate = stmtDate;
+    cfg.stmtDate = stmtDate;
   } else if (closingBalance === null && after.length) {
     cfg.accountBalance = r2(cfg.accountBalance + after.reduce((s, t) => s + t.amount, 0));
     cfg.balanceDate = after.reduce((m, t) => (t.date > m ? t.date : m), cfg.balanceDate);

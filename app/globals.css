@@ -106,6 +106,17 @@ body {
 }
 
 /* Campos: 16px evita o zoom automático do iPhone ao focar. */
+/* Evita que campos de data/hora e números passem do cartão no iPhone */
+input, select, textarea { max-width: 100%; box-sizing: border-box; min-width: 0; }
+input[type="date"], input[type="month"], input[type="time"], input[type="week"] {
+  -webkit-appearance: none; appearance: none; display: block; min-height: 46px; line-height: 1.2;
+}
+input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+select { -webkit-appearance: none; appearance: none; padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%237d8aa0' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; }
+.grid > *, .flex > * { min-width: 0; }
+
 input,
 textarea,
 select {

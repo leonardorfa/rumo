@@ -20,7 +20,7 @@ export function TxRow({ t, onOpen }: { t: Tx; onOpen: (t: Tx) => void }) {
         <span className="block text-[13px] text-ink3 truncate">
           {t.review ? <span className="text-alert font-medium">Revisar · </span> : null}
           {t.card ? "💳 " : ""}{t.manual ? "✍️ " : ""}{t.splitFrom ? "✂️ " : ""}
-          {catName(t.category, customs)}
+          {catName(t.category, customs)}{t.category === "pay_card" ? " · as compras estão em Cartão" : ""}
           {t.installment ? ` · parcela ${t.installment}` : ""}
           {t.note ? ` · ${t.note}` : ""}
         </span>

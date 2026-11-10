@@ -6,3 +6,9 @@ next-env.d.ts
 .netlify
 .env*
 *.tsbuildinfo
+
+public/seed.json
+public/setup.json
+*.backup.json
+rumo-backup-*.json
+rumo-metas-*.json

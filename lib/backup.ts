@@ -1,6 +1,6 @@
 import { localDay } from "./format";
 import { catName } from "./categories";
-import { exportBackup, getData, parseBackup, setData } from "./store";
+import { exportBackup, getData, parseBackup, resetChanges, setData, snapshotNow } from "./store";
 import type { Data } from "./types";
 
 const PW_KEY = "pdf-password";
@@ -11,7 +11,9 @@ export async function restoreFile(f: File, confirmReplace = true): Promise<numbe
   if (confirmReplace && getData().txs.length && !confirm(`Substituir tudo por esse backup (${data.txs.length} transações)?`)) {
     return -1;
   }
+  snapshotNow(); // o que estava no aparelho fica guardado em "estados anteriores"
   setData(data);
+  resetChanges();
   if (pdfPassword) {
     try {
       localStorage.setItem(PW_KEY, pdfPassword);
@@ -42,7 +44,10 @@ export async function shareFile(file: File): Promise<boolean> {
 export async function saveBackup(): Promise<boolean> {
   const d = getData();
   const ok = await shareFile(new File([exportBackup(d)], `rumo-backup-${localDay()}.json`, { type: "application/json" }));
-  if (ok) setData({ ...d, lastBackup: new Date().toISOString() });
+  if (ok) {
+    setData({ ...d, lastBackup: new Date().toISOString() });
+    resetChanges(); // o backup acabou de guardar tudo
+  }
   return ok;
 }
 

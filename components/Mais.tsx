@@ -6,7 +6,7 @@ import { NeedsPassword, pdfToText } from "@/lib/pdf";
 import { parseInvoiceText, type ParsedInvoice } from "@/lib/invoice";
 import { faceIdSupported, hashPin, registerFaceId } from "@/lib/lock";
 import { prettyName } from "@/lib/classifier";
-import { addCategory, cdbNet, cdbPrincipalNow, conferirCdb, deleteInvoice, invoiceOpen, toggleInvoicePaid, deleteCategory, deleteRule, editCategory, importInvoice, importParsed, getData, lastCdi, rendaFixaNow, setData, setLock, update, useData, type ImportStats } from "@/lib/store";
+import { addCategory, cdbNet, cdbPrincipalNow, conferirCdb, deleteInvoice, invoiceOpen, toggleInvoicePaid, deleteCategory, deleteRule, editCategory, importInvoice, importParsed, changesSinceBackup, getData, lastCdi, listSnapshots, rendaFixaNow, restoreSnapshot, setData, setLock, update, useData, type ImportStats } from "@/lib/store";
 import { refreshCdi } from "@/lib/cdi";
 import { importSetup } from "@/lib/life";
 import { aiConfig, apagarChave, chaveMascarada, MODELO_PADRAO, saveAiConfig } from "@/lib/ai";
@@ -113,6 +113,10 @@ export default function Mais({ goReview, goCdb }: { goReview: () => void; goCdb:
           {days === null ? "⚠︎ Você nunca salvou um backup. " : `Último backup há ${days} dia${days === 1 ? "" : "s"}. `}
           Os dados vivem só neste iPhone: se apagar o app, somem. Salve no iCloud Drive ou OneDrive.
         </p>
+        <p className="text-[13px] text-ink3 mb-3">
+          {changesSinceBackup() > 0 ? `${changesSinceBackup()} alteração(ões) feita(s) depois do último backup. ` : "Nada novo desde o último backup. "}
+          O arquivo leva tudo: transações, categorias, metas, treino, parcelas, CDB, contas e ajustes. Só a chave do Gemini fica de fora, de propósito. Atualizar o app nunca apaga nem pede para refazer nada; só reinstalar o ícone apaga.
+        </p>
         <div className="grid grid-cols-2 gap-2">
           <Button tone="primary" onClick={async () => (await saveBackup()) && toast("Backup salvo")}>Salvar backup</Button>
           <FilePick accept="application/json,.json" label="Restaurar" onFile={async (f) => {
@@ -136,6 +140,9 @@ export default function Mais({ goReview, goCdb }: { goReview: () => void; goCdb:
         }} />
         <p className="text-[13px] text-ink3 mt-2">“Importar metas e treino” soma ao que você já tem (metas, pesos, agenda). Não mexe em transações nem em saldos.</p>
       </Card>
+
+      <Section>Estados anteriores</Section>
+      <Anteriores />
 
       <Section>Segurança</Section>
       <Security />
@@ -795,5 +802,37 @@ function Theme() {
       if (v === "system") { localStorage.removeItem("theme"); delete document.documentElement.dataset.theme; }
       else { localStorage.setItem("theme", v); document.documentElement.dataset.theme = v; }
     }} options={[{ value: "system", label: "Automático" }, { value: "light", label: "Claro" }, { value: "dark", label: "Escuro" }]} />
+  );
+}
+
+/** Pontos de volta que o app guarda sozinho no aparelho (até 6, um a cada 20 minutos de uso). */
+function Anteriores() {
+  useData(); // atualiza a lista quando algo muda
+  const [tick, setTick] = useState(0);
+  const lista = useMemo(() => listSnapshots(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <Card>
+      <p className="text-ink2 mb-2 text-[14px]">
+        O app guarda sozinho, neste iPhone, os últimos estados dos seus dados. Se algo der errado, volte a um deles. Isso <b>não</b> substitui o backup em arquivo: some junto se o ícone for apagado.
+      </p>
+      {lista.length === 0 && <div className="text-ink3 text-[14px]">Ainda não há nenhum. Aparece depois de alguns minutos de uso.</div>}
+      <div className="divide-y divide-line">
+        {lista.map((x, i) => (
+          <div key={x.t} className="flex items-center gap-3 py-2.5">
+            <span className="flex-1 min-w-0">
+              <span className="block">{new Date(x.t).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+              <span className="block text-[12px] text-ink3">{x.tx} transações</span>
+            </span>
+            <Button className="!h-9 !px-3 text-[14px]" onClick={() => {
+              if (confirm("Voltar a este estado? O de agora também fica guardado, e dá para desfazer.")) {
+                restoreSnapshot(i);
+                setTick((n) => n + 1);
+                toast("Voltou ao estado anterior");
+              }
+            }}>Voltar</Button>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }

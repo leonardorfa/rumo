@@ -4,12 +4,12 @@ import { useMemo, useState } from "react";
 import { shareFile } from "@/lib/backup";
 import { localDay } from "@/lib/format";
 import {
-  buildIcs, deleteRoutine, MODELOS, deleteWeight, deleteWorkout, exerciseHistory, fitOf, goalStatus, knownExercises, lastSets, logWeight,
+  buildIcs, deleteRoutine, MODELOS, planForDay, setDayExtra, deleteWeight, deleteWorkout, exerciseHistory, fitOf, goalStatus, knownExercises, lastSets, logWeight,
   recordsOf, saveRoutine, saveWorkout, setTrainingDay, setTrainingTime, SUGESTOES, weekStats, weeklyVolume, weightTrend, WEEKDAYS,
 } from "@/lib/life";
-import { useData } from "@/lib/store";
+import { update, useData } from "@/lib/store";
 import type { Cardio, Routine, Workout } from "@/lib/types";
-import { BarsChart, TrendChart } from "./charts";
+import { BarsChart, MiniTrend, TrendChart } from "./charts";
 import { act, Button, Card, Progress, Section, Segmented, Sheet, Title, toast } from "./ui";
 
 type Aba = "hoje" | "progresso" | "plano";
@@ -43,19 +43,32 @@ function Hoje() {
   const f = fitOf(d);
   const hoje = localDay();
   const ws = weekStats(d);
-  const [treino, setTreino] = useState<{ w?: Workout; routineId?: string } | null>(null);
+  const [treino, setTreino] = useState<{ w?: Workout; routineId?: string; exercicios?: string[] } | null>(null);
   const [peso, setPeso] = useState(false);
+  const [outro, setOutro] = useState(false);
   const wd = new Date(hoje + "T12:00:00").getDay();
-  const rid = f.days[String(wd)];
-  const rotina = f.routines.find((r) => r.id === rid);
+  const plano = planForDay(d, wd);
+  const rotina = plano?.routine;
   const feitoHoje = f.workouts.find((w) => w.date === hoje);
   const meta = (d.goals ?? []).find((g) => g.kind === "weight");
   const ult = f.weights[f.weights.length - 1];
   const tend = weightTrend(d);
   const recentes = [...f.workouts].reverse().slice(0, 6);
+  const semRotinas = f.routines.length === 0;
+  const livre = !plano || !rotina; // descanso ou treino livre: você escolhe qual treino fazer
+  const comecar = (r?: Routine) => setTreino({ routineId: r?.id, exercicios: r && r.id === rotina?.id ? plano?.exercises : r?.exercises });
   return (
     <>
-      <Card className="mt-1">
+      {semRotinas && (
+        <Card className="mt-1">
+          <div className="font-semibold">Monte seus treinos</div>
+          <div className="text-[13px] text-ink2 mb-3">Três prontos para começar: peito, tríceps e ombro; costas e bíceps; perna. Depois você muda os exercícios do seu jeito em Plano.</div>
+          <Button tone="primary" className="w-full" onClick={() => act("3 treinos adicionados", (dd) => MODELOS.reduce((acc, m) => saveRoutine(acc, { id: "", name: m.name, focus: m.focus, exercises: m.exercises }), dd))}>
+            Adicionar os 3 treinos
+          </Button>
+        </Card>
+      )}
+      <Card className={semRotinas ? "mt-3" : "mt-1"}>
         <div className="text-[13px] text-ink3">{WEEKDAYS[wd]}, {dataBR(hoje).slice(0, 5)}</div>
         {feitoHoje ? (
           <>
@@ -65,19 +78,36 @@ function Hoje() {
           </>
         ) : (
           <>
-            <div className="text-[22px] font-bold">{rid === undefined ? "Dia de descanso" : rotina ? `Hoje: ${rotina.name}` : "Hoje é dia de treino"}</div>
-            <div className="text-[13px] text-ink2">
-              {rotina?.exercises.length ? rotina.exercises.join(" · ") : rid === undefined ? "Treinou mesmo assim? Dá para registrar." : "Registre o que fizer."}
-            </div>
-            {rotina && (rotina.focus || rotina.minutes || rotina.cardio) && (
-              <div className="text-[13px] text-ink3 mt-1">
-                {[rotina.focus && `Ênfase: ${rotina.focus}`, rotina.minutes && `${rotina.minutes} min`, rotina.cardio && `${rotina.cardio.tipo} ${rotina.cardio.min} min`].filter(Boolean).join(" · ")}
-              </div>
+            <div className="text-[22px] font-bold">{!plano ? "Dia de descanso" : rotina ? `Hoje: ${plano.name}` : "Hoje é dia de treino"}</div>
+            {plano && rotina && (
+              <>
+                <div className="text-[13px] text-ink2">{plano.exercises.join(" · ")}</div>
+                {(plano.focus || plano.minutes || plano.cardio) && (
+                  <div className="text-[13px] text-ink3 mt-1">
+                    {[plano.focus && `Ênfase: ${plano.focus}`, plano.minutes && `${plano.minutes} min`, plano.cardio && `${plano.cardio.tipo} ${plano.cardio.min} min`].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+              </>
             )}
-            <Button tone="primary" className="w-full mt-3" onClick={() => setTreino({ routineId: rotina?.id })}>
-              {rid === undefined ? "Registrar um treino" : "Iniciar treino"}
-            </Button>
+            {!livre && (
+              <>
+                <Button tone="primary" className="w-full mt-3" onClick={() => comecar(rotina)}>Iniciar treino</Button>
+                {!semRotinas && <button className="text-link text-[14px] font-semibold mt-2" onClick={() => setOutro(!outro)}>{outro ? "Esconder" : "Fazer outro treino hoje"}</button>}
+              </>
+            )}
+            {livre && !semRotinas && <div className="text-[13px] text-ink3 mt-1">{!plano ? "Treinou mesmo assim? Escolha qual:" : "Escolha qual treino vai fazer:"}</div>}
           </>
+        )}
+        {!feitoHoje && (livre || outro) && (
+          <div className="flex flex-col gap-2 mt-2">
+            {f.routines.map((r) => (
+              <button key={r.id} onClick={() => comecar(r)} className="rounded-xl bg-fill px-4 py-3 text-left">
+                <span className="block font-semibold">{r.name}</span>
+                <span className="block text-[12px] text-ink3 truncate">{r.exercises.join(", ")}</span>
+              </button>
+            ))}
+            <Button className="w-full" onClick={() => comecar()}>Treino livre (escolho na hora)</Button>
+          </div>
         )}
       </Card>
 
@@ -108,7 +138,7 @@ function Hoje() {
       <Card>
         {ult ? (
           <>
-            <div className="flex items-baseline gap-2">
+            <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-[28px] font-bold num">{num(ult.kg)} kg</span>
               <span className="text-ink3 text-[13px]">em {dataBR(ult.date).slice(0, 5)}</span>
               {tend !== null && <span className={`text-[13px] font-semibold ${tend > 0 ? "text-ok" : "text-ink2"}`}>{tend > 0 ? "▲ +" : tend < 0 ? "▼ " : ""}{num(tend, 2)} kg/sem</span>}
@@ -150,7 +180,7 @@ function Hoje() {
           </div>
         </>
       )}
-      {treino && <TreinoSheet w={treino.w} routineId={treino.routineId} onClose={() => setTreino(null)} />}
+      {treino && <TreinoSheet w={treino.w} routineId={treino.routineId} exercicios={treino.exercicios} onClose={() => setTreino(null)} />}
       {peso && <PesoSheet onClose={() => setPeso(false)} />}
     </>
   );
@@ -160,7 +190,7 @@ function Hoje() {
 
 type Bloco = { ex: string; sets: { kg: string; reps: string }[] };
 
-function TreinoSheet({ w, routineId, onClose }: { w?: Workout; routineId?: string; onClose: () => void }) {
+function TreinoSheet({ w, routineId, exercicios, onClose }: { w?: Workout; routineId?: string; exercicios?: string[]; onClose: () => void }) {
   const d = useData();
   const f = fitOf(d);
   const [rotId, setRotId] = useState(w?.routineId ?? routineId ?? "");
@@ -175,7 +205,7 @@ function TreinoSheet({ w, routineId, onClose }: { w?: Workout; routineId?: strin
       const ex = [...new Set(w.sets.map((s) => s.ex))];
       return ex.map((e) => ({ ex: e, sets: w.sets.filter((s) => s.ex === e).map((s) => ({ kg: String(s.kg).replace(".", ","), reps: String(s.reps) })) }));
     }
-    const exs = f.routines.find((r) => r.id === (routineId ?? ""))?.exercises ?? [];
+    const exs = exercicios ?? f.routines.find((r) => r.id === (routineId ?? ""))?.exercises ?? [];
     return exs.map((e) => ({ ex: e, sets: preencher(d, e) }));
   });
   // Trocar a rotina: sem nada digitado troca tudo; com séries já preenchidas só soma o que falta.
@@ -242,8 +272,8 @@ function TreinoSheet({ w, routineId, onClose }: { w?: Workout; routineId?: strin
               {b.sets.map((s, j) => (
                 <div key={j} className="contents">
                   <span className="text-[13px] text-ink3 text-center">{j + 1}</span>
-                  <input inputMode="decimal" className="num text-center" placeholder="kg" value={s.kg} onChange={(e) => set(i, j, { kg: e.target.value })} aria-label={`Carga da série ${j + 1}`} />
-                  <input inputMode="numeric" className="num text-center" placeholder="reps" value={s.reps} onChange={(e) => set(i, j, { reps: e.target.value })} aria-label={`Repetições da série ${j + 1}`} />
+                  <input inputMode="decimal" className="num text-center !px-1" placeholder="kg" value={s.kg} onChange={(e) => set(i, j, { kg: e.target.value })} aria-label={`Carga da série ${j + 1}`} />
+                  <input inputMode="numeric" className="num text-center !px-1" placeholder="reps" value={s.reps} onChange={(e) => set(i, j, { reps: e.target.value })} aria-label={`Repetições da série ${j + 1}`} />
                   <button className="text-ink3" aria-label="Tirar série" onClick={() => setBlocos(blocos.map((x, y) => (y === i ? { ...x, sets: x.sets.filter((_, z) => z !== j) } : x)))}>×</button>
                 </div>
               ))}
@@ -357,6 +387,8 @@ function Progresso() {
           : <div className="text-ink2">Registre pelo menos 2 pesos para ver o gráfico.</div>}
       </Card>
 
+      <PorTreino />
+
       <Section>Cargas</Section>
       {comHist.length === 0 ? (
         <Card className="text-ink2">Registre treinos na aba Hoje e a evolução de cada exercício aparece aqui.</Card>
@@ -404,6 +436,61 @@ function Progresso() {
   );
 }
 
+/** Cada treino com todos os seus exercícios e um gráfico da carga de cada um ao longo dos dias. */
+function PorTreino() {
+  const d = useData();
+  const f = fitOf(d);
+  const [rid, setRid] = useState(f.routines[0]?.id ?? "");
+  const r = f.routines.find((x) => x.id === rid) ?? f.routines[0];
+  if (!r) return null;
+  // exercícios da rotina + extras de qualquer dia que use ela + o que você já fez nela
+  const extras = Object.entries(f.days).filter(([, v]) => v === r.id).flatMap(([wd]) => f.dayExtra?.[wd]?.extra ?? []);
+  const feitos = f.workouts.filter((w) => w.routineId === r.id).flatMap((w) => w.sets.map((s) => s.ex));
+  const exs = [...new Map([...r.exercises, ...extras, ...feitos].map((e) => [e.toLowerCase(), e])).values()];
+  return (
+    <>
+      <Section>Por treino</Section>
+      <select value={r.id} onChange={(e) => setRid(e.target.value)} className="mb-3">
+        {f.routines.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+      </select>
+      <div className="flex flex-col gap-3">
+        {exs.map((ex) => {
+          const h = exerciseHistory(d, ex);
+          const ult = h[h.length - 1];
+          const melhor = h.reduce((m, x) => (x.kg > m ? x.kg : m), 0);
+          const u = lastSets(d, ex);
+          return (
+            <Card key={ex}>
+              <div className="flex justify-between items-baseline gap-2">
+                <span className="font-semibold">{ex}</span>
+                {melhor > 0 && <span className="text-[12px] text-ink3 shrink-0">recorde {num(melhor)} kg</span>}
+              </div>
+              {h.length === 0 ? (
+                <div className="text-[13px] text-ink3 mt-1">Ainda sem registro. Faça o treino e anote a carga.</div>
+              ) : (
+                <>
+                  <div className="text-[13px] text-ink2 mt-0.5">
+                    Última vez ({dataBR(ult.date).slice(0, 5)}): {u ? u.sets.map((s) => `${num(s.kg)}×${s.reps}`).join(", ") : ""}
+                  </div>
+                  {h.length >= 2 ? (
+                    <div className="mt-2"><MiniTrend data={h.map((x) => ({ label: dataBR(x.date).slice(0, 5), value: x.kg }))} unit="kg" /></div>
+                  ) : <div className="text-[12px] text-ink3 mt-1">Com o segundo treino aparece o gráfico.</div>}
+                  {h.length >= 2 && (
+                    <div className="text-[12px] text-ink3 flex justify-between mt-1">
+                      <span>{dataBR(h[0].date).slice(0, 5)}: {num(h[0].kg)} kg</span>
+                      <span className={ult.kg >= h[0].kg ? "text-ok" : "text-alert"}>{ult.kg >= h[0].kg ? "+" : ""}{num(ult.kg - h[0].kg)} kg</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 // ---------- plano ----------
 
 const resumoRotina = (r: Routine) =>
@@ -420,16 +507,17 @@ function Plano() {
       <Section>Semana</Section>
       <div className="card px-4">
         {ORDEM.map((wd, i) => {
-          const v = f.days[String(wd)];
-          const r = f.routines.find((x) => x.id === v);
+          const pl = planForDay(d, wd);
           return (
             <button key={wd} onClick={() => setDia(wd)} className={`w-full flex items-center gap-3 py-3 text-left ${i ? "border-t border-line" : ""}`}>
               <span className="w-[72px] shrink-0 font-medium">{WEEKDAYS[wd]}</span>
               <span className="flex-1 min-w-0">
-                {v === undefined ? <span className="text-ink3">Descanso</span> : (
+                {!pl ? <span className="text-ink3">Descanso</span> : (
                   <>
-                    <span className="block truncate">{r ? r.name : "Treino livre"}</span>
-                    <span className="block text-[12px] text-ink3 truncate">{r ? resumoRotina(r) : "você escolhe os exercícios na hora"}</span>
+                    <span className="block truncate">{pl.name}</span>
+                    <span className="block text-[12px] text-ink3 truncate">
+                      {pl.routine ? [pl.focus && `ênfase ${pl.focus}`, pl.minutes && `${pl.minutes} min`, pl.cardio && `${pl.cardio.tipo} ${pl.cardio.min} min`, `${pl.exercises.length} exercícios`].filter(Boolean).join(" · ") : "você escolhe os exercícios na hora"}
+                    </span>
                   </>
                 )}
               </span>
@@ -477,15 +565,30 @@ function Plano() {
   );
 }
 
-/** Um dia da semana: descanso ou treino, e qual rotina. */
+/** Um dia da semana: descanso ou treino, qual rotina e os ajustes daquele dia (ênfase, tempo, cardio, exercícios a mais). */
 function DiaSheet({ wd, onClose, onEditar, onNova }: { wd: number; onClose: () => void; onEditar: (r: Routine) => void; onNova: (wd: number) => void }) {
   const d = useData();
   const f = fitOf(d);
   const v = f.days[String(wd)];
   const treina = v !== undefined;
+  const e = f.dayExtra?.[String(wd)] ?? {};
+  const rotina = f.routines.find((r) => r.id === v);
+  const [foco, setFoco] = useState(e.focus ?? "");
+  const [min, setMin] = useState(e.minutes ? String(e.minutes) : "");
+  const [cMin, setCMin] = useState(e.cardio ? String(e.cardio.min) : "");
+  const [extra, setExtra] = useState<string[]>(e.extra ?? []);
+  const [add, setAdd] = useState(false);
   const escolher = (id: string | null) => act("Agenda atualizada", (dd) => setTrainingDay(dd, wd, id));
+  function pronto() {
+    const m = Math.round(parse(min)), c = Math.round(parse(cMin));
+    update((dd) => setDayExtra(dd, wd, treina ? {
+      focus: foco.trim() || undefined, minutes: Number.isFinite(m) && m > 0 ? m : undefined,
+      cardio: Number.isFinite(c) && c > 0 ? { tipo: e.cardio?.tipo ?? rotina?.cardio?.tipo ?? "Bike", min: c } : undefined, extra,
+    } : null));
+    onClose();
+  }
   return (
-    <Sheet open onClose={onClose} title={WEEKDAYS[wd]}>
+    <Sheet open onClose={pronto} title={WEEKDAYS[wd]}>
       <Segmented value={treina ? "treino" : "rest"} onChange={(x) => escolher(x === "rest" ? null : v ?? "")}
         options={[{ value: "rest", label: "Descanso" }, { value: "treino", label: "Treino" }]} />
       {treina && (
@@ -508,9 +611,30 @@ function DiaSheet({ wd, onClose, onEditar, onNova }: { wd: number; onClose: () =
             ))}
           </div>
           <Button className="w-full mt-3" onClick={() => onNova(wd)}>+ Nova rotina para {WEEKDAYS[wd].toLowerCase()}</Button>
+
+          <div className="text-[13px] text-ink3 px-1 mt-5 mb-1.5">Só neste dia ({WEEKDAYS[wd].toLowerCase()})</div>
+          <div className="card p-3">
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <label className="block min-w-0"><span className="block text-[12px] text-ink3 px-1 mb-1">Ênfase</span>
+                <input value={foco} onChange={(x) => setFoco(x.target.value)} placeholder={rotina?.focus ?? "Ex.: ombro"} /></label>
+              <label className="block min-w-0"><span className="block text-[12px] text-ink3 px-1 mb-1">Tempo (min)</span>
+                <input inputMode="numeric" className="num" value={min} onChange={(x) => setMin(x.target.value)} placeholder={rotina?.minutes ? String(rotina.minutes) : "60"} /></label>
+            </div>
+            <label className="block mb-3"><span className="block text-[12px] text-ink3 px-1 mb-1">Cardio (min)</span>
+              <input inputMode="numeric" className="num" value={cMin} onChange={(x) => setCMin(x.target.value)} placeholder={rotina?.cardio ? `${rotina.cardio.tipo} ${rotina.cardio.min}` : "0"} /></label>
+            <div className="text-[12px] text-ink3 px-1 mb-1">Exercícios a mais neste dia</div>
+            {extra.map((x, i) => (
+              <div key={x + i} className="flex items-center gap-2 py-2 border-t border-line">
+                <span className="flex-1 min-w-0 truncate">{x}</span>
+                <button className="text-ink3 px-2" aria-label="Tirar" onClick={() => setExtra(extra.filter((_, y) => y !== i))}>×</button>
+              </div>
+            ))}
+            <Button className="w-full mt-2 !h-9" onClick={() => setAdd(true)}>+ Exercício só neste dia</Button>
+          </div>
         </>
       )}
-      <Button tone="primary" className="w-full mt-4" onClick={onClose}>Pronto</Button>
+      <Button tone="primary" className="w-full mt-4" onClick={pronto}>Pronto</Button>
+      {add && <EscolherExercicio onPick={(x) => { setExtra([...extra, x]); setAdd(false); }} onClose={() => setAdd(false)} />}
     </Sheet>
   );
 }

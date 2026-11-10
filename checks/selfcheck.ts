@@ -465,15 +465,15 @@ console.log("cdb movimentos ok");
   let v: import("../lib/types").Data = { version: 1, txs: [], father: [], rules: [], lastBackup: null,
     config: { ...S.DEFAULT_CONFIG, accountBalance: 20000, bills: [], fatherCreditStart: 0, rendaFixa: 0, salary: 2270 } };
   const hoje = new Date(2026, 10, 8, 12);
-  assert.equal(L.ageText("2006-06-19", hoje), "20 anos e 4 meses");
-  assert.equal(L.birthdayAt("2006-06-19", 25), "2031-06-19");
-  assert.equal(L.ageAt("2006-06-19", "2031-06-18"), 24);
+  assert.equal(L.ageText("2005-03-15", hoje), "21 anos e 7 meses");
+  assert.equal(L.birthdayAt("2005-03-15", 25), "2030-03-15");
+  assert.equal(L.ageAt("2005-03-15", "2030-03-14"), 24);
   // 500 mil aos 25: aporte mensal a juros compostos
-  const meta500 = { id: "m", title: "500 mil", icon: "🎯", kind: "net" as const, unit: "R$", start: 20000, startDate: "2026-11-08", target: 500000, deadline: "2031-06-19" };
+  const meta500 = { id: "m", title: "500 mil", icon: "🎯", kind: "net" as const, unit: "R$", start: 20000, startDate: "2026-11-08", target: 500000, deadline: "2031-06-15" };
   v = L.saveGoal(v, meta500);
   const pl = L.moneyPlan(v, meta500, hoje);
   assert.equal(pl.v0, 20000);
-  assert.equal(pl.n, 55, "55 meses até 19/06/2031");
+  assert.equal(pl.n, 55, "55 meses até 15/06/2031");
   // confere: guardando o aporte a 10% a.a., chega no alvo
   const i = 1.1 ** (1 / 12) - 1;
   const fim = 20000 * (1 + i) ** 55 + pl.aporte * (((1 + i) ** 55 - 1) / i);
@@ -525,8 +525,8 @@ console.log("cdb movimentos ok");
   assert.ok(ics.includes("SUMMARY:Treino · Peito"));
   // configuração inicial por arquivo não duplica
   const base = { ...v };
-  const imp = L.importSetup(base, { prefs: { birth: "2006-06-19" }, goals: [meta500], fit: { weights: [{ date: "2026-09-10", kg: 65 }], days: { "2": "" }, time: "19:00" } });
-  assert.deepEqual([imp.metas, imp.pesos, imp.data.config.prefs.birth], [0, 1, "2006-06-19"], "meta com mesmo id não duplica");
+  const imp = L.importSetup(base, { prefs: { birth: "2005-03-15" }, goals: [meta500], fit: { weights: [{ date: "2026-09-10", kg: 65 }], days: { "2": "" }, time: "19:00" } });
+  assert.deepEqual([imp.metas, imp.pesos, imp.data.config.prefs.birth], [0, 1, "2005-03-15"], "meta com mesmo id não duplica");
   assert.equal(L.importSetup(imp.data, { goals: [], fit: { weights: [{ date: "2026-09-10", kg: 65 }] } }).pesos, 0, "importar de novo não duplica");
 }
 console.log("metas de vida e treino ok");
@@ -565,3 +565,80 @@ console.log("metas de vida e treino ok");
   assert.ok(r[0].liquido < r[0].bruto && r[2].bruto > r[0].bruto * 20);
 }
 console.log("aba cdb ok");
+{
+  // ---- extrato: lançamento seu de hoje não pode travar o saldo do extrato novo ----
+  const S = require("../lib/store") as typeof import("../lib/store");
+  let e: import("../lib/types").Data = { version: 1, txs: [], father: [], rules: [], lastBackup: null,
+    config: { ...S.DEFAULT_CONFIG, accountBalance: 1000, balanceDate: "2026-10-01", bills: [], fatherCreditStart: 0, rendaFixa: 0 } };
+  // extrato de 25/10 com saldo 800
+  e = S.importParsed(e, [{ date: "2026-10-20", description: "MERCADO", amount: -200 }], 800, "2026-10-25").data;
+  assert.equal(e.config.accountBalance, 800);
+  // você lança 50 de hoje (05/11): move o balanceDate para 05/11
+  e = S.addManual(e, { date: "2026-11-05", description: "Almoço", amount: -50, category: "var_food" });
+  assert.equal(e.config.accountBalance, 750);
+  // chega o extrato de 31/10 (anterior ao lançamento, posterior ao último extrato): tem que valer
+  e = S.importParsed(e, [{ date: "2026-10-28", description: "FARMACIA", amount: -100 }], 650, "2026-10-31").data;
+  assert.equal(e.config.accountBalance, 600, "saldo do extrato (650) menos o lançamento de 05/11 (50)");
+  assert.equal(e.config.stmtDate, "2026-10-31");
+  // extrato mais velho que o último não rebaixa o saldo
+  const velho = S.importParsed(e, [{ date: "2026-10-10", description: "X", amount: -5 }], 9999, "2026-10-12");
+  assert.equal(velho.data.config.accountBalance, 600);
+  assert.equal(velho.stats.closingApplied, false);
+
+  // ---- meu dinheiro em partes ----
+  const base: import("../lib/types").Data = { version: 1, txs: [], father: [], rules: [], lastBackup: null,
+    config: { ...S.DEFAULT_CONFIG, accountBalance: 10000, bills: [], fatherCreditStart: 3000, rendaFixa: 5000, rendaFixaDate: "2026-11-01",
+      cdb: { pctCdi: 100, cdiAnnual: 13.65, principal: 5000, moves: [] } } };
+  let m = S.moneyParts(base, new Date(2026, 10, 1, 12));
+  assert.equal(m.disponivel, 7000, "10.000 na conta menos 3.000 do pai");
+  assert.equal(m.aReceber, 0);
+  assert.equal(m.total, Math.round((m.disponivel + m.cdb + m.aReceber) * 100) / 100, "total = disponível + CDB + a receber");
+  // pai passa a dever 500: entra em a receber
+  const deve = S.fatherSet(base, -500, "ajuste");
+  m = S.moneyParts(deve, new Date(2026, 10, 1, 12));
+  assert.equal(m.disponivel, 10000, "tudo na conta é seu");
+  assert.equal(m.doPai, 500);
+  assert.equal(m.total, 10000 + m.cdb + 500, "o que o pai deve conta no total");
+  // pessoas que devem + fatura em aberto
+  const mais = S.importInvoice(S.addReceivable(deve, { person: "Ana", description: "", amount: 200, date: "2026-11-01", saiuDaConta: false }),
+    [{ date: "2026-10-20", description: "LOJA", amount: -300 }], { due: "2026-11-10", total: 300 }).data;
+  m = S.moneyParts(mais, new Date(2026, 10, 1, 12));
+  assert.deepEqual([m.pessoas, m.aReceber, m.fatura, m.disponivel], [200, 700, 300, 9700], "a receber = pai + pessoas; disponível desconta a fatura");
+  assert.equal(m.total, Math.round((m.disponivel + m.cdb + m.aReceber) * 100) / 100);
+}
+console.log("saldo e partes ok");
+{
+  // ---- 3 treinos, ajustes por dia, reorganizar por arquivo ----
+  const L = require("../lib/life") as typeof import("../lib/life");
+  const S = require("../lib/store") as typeof import("../lib/store");
+  let v: import("../lib/types").Data = { version: 1, txs: [], father: [], rules: [], lastBackup: null,
+    config: { ...S.DEFAULT_CONFIG, bills: [], fatherCreditStart: 0, rendaFixa: 0 } };
+  // estado antigo: 4 rotinas
+  v = L.saveRoutine(v, { id: "rot-ter", name: "Peito (terça)", exercises: ["Crucifixo"] });
+  v = L.saveRoutine(v, { id: "rot-sab", name: "Peito (sábado)", exercises: ["Crucifixo", "Supino na máquina"] });
+  v = L.setTrainingDay(L.setTrainingDay(v, 2, "rot-ter"), 6, "rot-sab");
+  v = L.saveWorkout(v, { id: "w1", date: "2026-11-03", routineId: "rot-ter", sets: [{ ex: "Crucifixo", kg: 20, reps: 10 }] });
+  const arq = { fit: { replace: true, remap: { "rot-ter": "rot-peito", "rot-sab": "rot-peito" },
+    routines: [{ id: "rot-peito", name: "Peito, tríceps e ombro", exercises: ["Supino na máquina", "Crucifixo"], cardio: { tipo: "Bike", min: 20 } }, { id: "rot-perna", name: "Perna", exercises: ["Leg press"] }],
+    days: { "2": "rot-peito", "6": "rot-peito", "4": "rot-perna" },
+    dayExtra: { "6": { focus: "Ombro", minutes: 90, extra: ["Elevação lateral com halter", "Crucifixo"] }, "2": { minutes: 60 } } } };
+  const r = L.importSetup(v, arq).data;
+  assert.deepEqual(L.fitOf(r).routines.map((x) => x.name), ["Peito, tríceps e ombro", "Perna"], "ficam só as 3 rotinas do arquivo");
+  assert.equal(L.fitOf(r).workouts[0].routineId, "rot-peito", "o treino já feito vai para a rotina nova");
+  const sab = L.planForDay(r, 6)!;
+  assert.deepEqual([sab.name, sab.focus, sab.minutes, sab.cardio?.min], ["Peito, tríceps e ombro", "Ombro", 90, 20]);
+  assert.deepEqual(sab.exercises, ["Supino na máquina", "Crucifixo", "Elevação lateral com halter"], "extras do dia entram sem repetir");
+  const ter = L.planForDay(r, 2)!;
+  assert.deepEqual([ter.focus, ter.minutes, ter.exercises.length], [undefined, 60, 2], "terça: 60 min, sem extra");
+  assert.equal(L.planForDay(r, 1), null, "segunda: descanso");
+  // mudar o ajuste de um dia pela tela
+  const m = L.setDayExtra(r, 6, { focus: "  ", minutes: 0, extra: [] });
+  assert.equal(L.fitOf(m).dayExtra!["6"], undefined, "ajuste vazio some");
+  // agenda: duração por dia e descrição com \n literal
+  const ics = L.buildIcs(L.setTrainingTime(r, "19:00"), new Date(2026, 10, 8, 12));
+  assert.ok(ics.includes("DTSTART:20261110T190000") && ics.includes("DTEND:20261110T200000"), "terça: 60 min");
+  assert.ok(ics.includes("DTEND:20261107T203000") || ics.includes("DTEND:20261114T203000"), "sábado: 90 min");
+  assert.ok(!/DESCRIPTION:[^\r\n]*\r?\n[A-Za-z]/.test(ics.replace(/BEGIN:VALARM[\s\S]*?END:VALARM/g, "")), "descrição não quebra linha");
+  assert.ok(ics.includes("Ênfase: Ombro\\nSupino na máquina"), "linhas separadas por \n do ICS");
+}
+console.log("treino em 3 divisões ok");

@@ -3,8 +3,6 @@
  * É uma tranca local, não login de servidor: nada sai do aparelho.
  */
 
-/** sha256("091920") — PIN inicial. Trocável em Mais › Segurança. */
-export const DEFAULT_PIN_HASH = "2d01eefcc31ffeb982c96b54191e84a011afc852fc8f266f8c53a6884d2cb5ad";
 
 export async function hashPin(pin: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pin));

@@ -10,6 +10,7 @@ import { myMoney as myMoneyNow, update, useData } from "@/lib/store";
 import type { Goal } from "@/lib/types";
 import { TrendChart } from "./charts";
 import Assistente from "./Assistente";
+import { Partes } from "./Partes";
 import { PesoSheet } from "./Treino";
 import { act, Button, Card, Money, Progress, Section, Segmented, Sheet, toast } from "./ui";
 
@@ -102,6 +103,7 @@ function GoalCard({ g, onEdit, onPeso, onValor }: { g: Goal; onEdit: () => void;
         <div className="text-[13px] text-ink3 mt-1">
           até {dataBR(g.deadline)}{idade !== null ? ` · aos ${idade} anos` : ""}
         </div>
+        {g.kind === "net" && <Partes />}
         {!s.batida && g.kind !== "net" && g.deadline > hoje && (
           <div className={`mt-2 text-[14px] ${s.naFrente ? "text-ok" : "text-alert"}`}>
             {s.naFrente ? "✓ No ritmo" : "⚠︎ Atrasado"}: pelo prazo você deveria estar em {fmtG(g, s.esperado)}.

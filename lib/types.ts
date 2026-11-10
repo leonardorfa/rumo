@@ -67,6 +67,7 @@ export interface Config {
   goalDeadline: string; // YYYY-MM
   accountBalance: number; // saldo da conta (inclui o crédito do pai)
   balanceDate: string; // de quando é o saldo acima
+  stmtDate?: string; // fechamento do último extrato importado (lançar na mão não mexe nele)
   rendaFixa: number; // valor acumulado do CDB na data abaixo
   rendaFixaDate: string; // quando esse valor foi conferido no app do C6
   cdb: {
@@ -135,10 +136,14 @@ export interface Workout {
   cardio?: Cardio; // o que você fez de cardio
   sets: { ex: string; kg: number; reps: number }[];
 }
+/** O que muda num dia da semana em relação à rotina (ex.: sábado com ênfase em ombro). */
+export interface DayExtra { focus?: string; minutes?: number; cardio?: Cardio; extra?: string[] }
+
 /** Treino: peso, agenda da semana, rotinas e o que você fez em cada dia. */
 export interface Fit {
   weights: { date: string; kg: number }[];
   days: Record<string, string>; // "0" domingo … "6" sábado → id da rotina ("" = treino sem rotina); ausente = descanso
+  dayExtra?: Record<string, DayExtra>; // ajustes de cada dia (ênfase, tempo, cardio, exercícios a mais)
   time: string; // "18:00", só para a agenda
   routines: Routine[];
   workouts: Workout[];

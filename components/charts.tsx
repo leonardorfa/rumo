@@ -220,3 +220,22 @@ export function BarsChart({ data, name, color = "var(--meu)" }: { data: { label:
     </div>
   );
 }
+
+/** Gráfico pequeno de um exercício: a carga em cada treino, sem eixos. */
+export function MiniTrend({ data, unit }: { data: { label: string; value: number }[]; unit: string }) {
+  const hidden = useContext(HideCtx);
+  const vals = data.map((d) => d.value);
+  const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo || 1) * 0.25;
+  return (
+    <div className="h-20 -mx-1">
+      <ResponsiveContainer>
+        <LineChart data={data} margin={{ top: 8, right: 10, bottom: 4, left: 10 }}>
+          <XAxis dataKey="label" hide />
+          <YAxis domain={[lo - pad, hi + pad]} hide />
+          {!hidden && <Tooltip {...tip} formatter={(v: number) => [`${v.toLocaleString("pt-BR")} ${unit}`, "Carga"]} />}
+          <Line dataKey="value" stroke="var(--meu)" strokeWidth={2.5} isAnimationActive={false} dot={{ r: 3.5, fill: "var(--meu)", stroke: "var(--card)", strokeWidth: 2 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

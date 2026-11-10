@@ -10,6 +10,7 @@ import { categoryAverages, deleteEnvelope, envelopeBudgets, envelopesFromHistory
 import type { Data, Envelope } from "@/lib/types";
 import { ForecastChart, ProjectionChart } from "./charts";
 import Vida from "./Vida";
+import { Partes } from "./Partes";
 import { act, Button, Card, Money, MonthSwitcher, Progress, Section, Segmented, Sheet, Title, toast } from "./ui";
 
 export default function Metas() {
@@ -63,7 +64,7 @@ export default function Metas() {
 
       <div className="sticky top-0 z-20 -mx-4 px-4 pt-1 pb-2 bg-bg" style={{ paddingTop: "max(4px, env(safe-area-inset-top))" }}>
         <Segmented value={aba} onChange={trocarAba}
-          options={[{ value: "vida", label: "Vida" }, { value: "meta", label: "Este ano" }, { value: "areas", label: "Áreas" }, { value: "previsao", label: "Previsão" }]} />
+          options={[{ value: "vida", label: "Vida" }, { value: "meta", label: "Atual" }, { value: "areas", label: "Áreas" }, { value: "previsao", label: "Previsão" }]} />
       </div>
 
       {aba === "vida" && <Vida />}
@@ -81,6 +82,7 @@ export default function Metas() {
         <div className="text-[13px] text-ink2 mt-2">
           {meu >= goal ? "Meta batida hoje." : <>Faltam <Money v={goal - meu} /></>}
         </div>
+        <Partes />
       </Card>
 
       <Section>Quanto posso gastar</Section>

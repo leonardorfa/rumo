@@ -2,7 +2,7 @@
 import { localDay } from "./format";
 import { netWorthHistory } from "./insights";
 import { myMoney } from "./store";
-import type { Data, Fit, Goal, Routine, Workout } from "./types";
+import type { Cardio, Data, DayExtra, Fit, Goal, Routine, Workout } from "./types";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const uid = () => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
@@ -47,7 +47,21 @@ export function spanText(from: string, to: string): string {
 
 const lastBy = <T extends { date: string }>(xs: T[]) => [...xs].sort((a, b) => (a.date < b.date ? 1 : -1))[0];
 
-export const fitOf = (d: Data): Fit => ({ weights: [], days: {}, time: "18:00", routines: [], workouts: [], ...(d.fit ?? {}) });
+export const fitOf = (d: Data): Fit => ({ weights: [], days: {}, dayExtra: {}, time: "18:00", routines: [], workouts: [], ...(d.fit ?? {}) });
+
+/** O que está planejado para um dia da semana: a rotina com os ajustes daquele dia. null = descanso. */
+export function planForDay(d: Data, wd: number): { routine?: Routine; name: string; focus?: string; minutes?: number; cardio?: Cardio; exercises: string[] } | null {
+  const f = fitOf(d);
+  const rid = f.days[String(wd)];
+  if (rid === undefined) return null;
+  const r = f.routines.find((x) => x.id === rid);
+  const e = f.dayExtra?.[String(wd)] ?? {};
+  const base = r?.exercises ?? [];
+  return {
+    routine: r, name: r?.name ?? "Treino livre", focus: e.focus || r?.focus, minutes: e.minutes ?? r?.minutes, cardio: e.cardio ?? r?.cardio,
+    exercises: [...base, ...(e.extra ?? []).filter((x) => !base.includes(x))],
+  };
+}
 
 /** Onde você está hoje em relação à meta. */
 export function goalCurrent(d: Data, g: Goal): number {
@@ -145,6 +159,19 @@ export function setTrainingDay(d: Data, weekday: number, routineId: string | nul
   if (routineId === null) delete days[String(weekday)];
   else days[String(weekday)] = routineId;
   return setFit(d, { days });
+}
+export function setDayExtra(d: Data, weekday: number, extra: DayExtra | null): Data {
+  const de = { ...(fitOf(d).dayExtra ?? {}) };
+  const limpo = extra && { ...extra };
+  if (limpo) {
+    if (!limpo.focus?.trim()) delete limpo.focus;
+    if (!limpo.minutes || limpo.minutes <= 0) delete limpo.minutes;
+    if (!limpo.cardio || limpo.cardio.min <= 0) delete limpo.cardio;
+    if (!limpo.extra?.length) delete limpo.extra;
+  }
+  if (!limpo || !Object.keys(limpo).length) delete de[String(weekday)];
+  else de[String(weekday)] = limpo;
+  return setFit(d, { dayExtra: de });
 }
 export const setTrainingTime = (d: Data, time: string): Data => setFit(d, { time });
 
@@ -272,9 +299,8 @@ export const SUGESTOES = [
 /** Modelos para começar: você adiciona e muda do seu jeito. */
 export const MODELOS: { name: string; focus: string; exercises: string[] }[] = [
   { name: "Peito, tríceps e ombro", focus: "Peito", exercises: ["Supino na máquina", "Crucifixo", "Tríceps corda", "Tríceps francês", "Elevação lateral na máquina"] },
-  { name: "Costas e bíceps", focus: "Costas", exercises: ["Puxada na barra", "Puxada no triângulo", "Puxada na máquina", "Remada baixa", "Rosca Scott na máquina", "Rosca martelo"] },
-  { name: "Perna", focus: "Quadríceps", exercises: ["Leg press", "Cadeira extensora", "Agachamento hack", "Panturrilha no hack"] },
-  { name: "Ombro e braço", focus: "Ombro", exercises: ["Desenvolvimento na máquina", "Elevação lateral com halter", "Crucifixo inverso", "Rosca martelo", "Tríceps corda"] },
+  { name: "Costas e bíceps", focus: "Costas", exercises: ["Puxada na barra", "Puxada no triângulo", "Puxada na máquina", "Remada", "Rosca Scott na máquina", "Rosca martelo"] },
+  { name: "Perna", focus: "Perna", exercises: ["Leg press", "Cadeira extensora", "Agachamento hack", "Panturrilha no hack"] },
 ];
 
 // ---------- agenda (.ics) ----------
@@ -294,11 +320,12 @@ export function buildIcs(d: Data, now = new Date()): string {
   const ev = Object.entries(f.days).map(([wd, rid]) => {
     const w = Number(wd);
     const primeiro = Array.from({ length: 7 }, (_, i) => addDaysIso(hoje, i)).find((x) => new Date(t(x)).getDay() === w)!;
-    const rot = f.routines.find((r) => r.id === rid);
-    const nome = rot?.name;
-    const dur = rot?.minutes ?? 75;
+    const plano = planForDay(d, w);
+    const nome = plano?.routine?.name;
+    const dur = plano?.minutes ?? 75;
     const fim = (hh * 60 + mm + dur) % 1440;
-    const desc = rot ? [rot.focus ? `Ênfase: ${rot.focus}` : "", ...rot.exercises, rot.cardio ? `Cardio: ${rot.cardio.tipo} ${rot.cardio.min} min` : ""].filter(Boolean).join("\n").replace(/,/g, "\,") : "";
+    const linhas = plano ? [plano.focus ? `Ênfase: ${plano.focus}` : "", ...plano.exercises, plano.cardio ? `Cardio: ${plano.cardio.tipo} ${plano.cardio.min} min` : ""].filter(Boolean) : [];
+    const desc = linhas.map((l) => l.replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;")).join("\\n");
     return [
       "BEGIN:VEVENT",
       `UID:treino-${w}@rumo.app`,
@@ -332,11 +359,26 @@ export function importSetup(d: Data, json: unknown): { data: Data; metas: number
   const datas = new Set(f.weights.map((w) => w.date));
   const pesos = (j.fit?.weights ?? []).filter((w) => w?.date && w.kg > 0 && !datas.has(w.date));
   const rids = new Set(f.routines.map((r) => r.id));
-  out = setFit(out, {
-    weights: [...f.weights, ...pesos].sort((a, b) => (a.date < b.date ? -1 : 1)),
-    routines: [...f.routines, ...(j.fit?.routines ?? []).filter((r) => r?.id && !rids.has(r.id))],
-    days: { ...(j.fit?.days ?? {}), ...Object.fromEntries(Object.entries(f.days).filter(([k, v]) => v !== "" || !(j.fit?.days ?? {})[k])) },
-    time: j.fit?.time && f.time === "18:00" ? j.fit.time : f.time,
-  });
+  const novoFit = j.fit as (Partial<Fit> & { replace?: boolean; remap?: Record<string, string> }) | undefined;
+  if (novoFit?.replace) {
+    // reorganiza: troca rotinas, dias e ajustes do arquivo e leva os treinos já feitos para as rotinas novas
+    const remap = novoFit.remap ?? {};
+    out = setFit(out, {
+      weights: [...f.weights, ...pesos].sort((a, b) => (a.date < b.date ? -1 : 1)),
+      routines: novoFit.routines ?? [],
+      days: { ...(novoFit.days ?? {}) },
+      dayExtra: { ...(novoFit.dayExtra ?? {}) },
+      workouts: f.workouts.map((w) => (w.routineId && remap[w.routineId] ? { ...w, routineId: remap[w.routineId] } : w)),
+      time: novoFit.time ?? f.time,
+    });
+  } else {
+    out = setFit(out, {
+      weights: [...f.weights, ...pesos].sort((a, b) => (a.date < b.date ? -1 : 1)),
+      routines: [...f.routines, ...(j.fit?.routines ?? []).filter((r) => r?.id && !rids.has(r.id))],
+      days: { ...(j.fit?.days ?? {}), ...Object.fromEntries(Object.entries(f.days).filter(([k, v]) => v !== "" || !(j.fit?.days ?? {})[k])) },
+      dayExtra: { ...(j.fit?.dayExtra ?? {}), ...(f.dayExtra ?? {}) },
+      time: j.fit?.time && f.time === "18:00" ? j.fit.time : f.time,
+    });
+  }
   return { data: out, metas: novas.length, pesos: pesos.length };
 }

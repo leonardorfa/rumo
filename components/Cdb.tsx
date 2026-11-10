@@ -98,6 +98,29 @@ export default function Cdb() {
         <p className="text-[12px] text-ink3 mt-2">Com a taxa de hoje: {num(c.cdb.pctCdi)}% do CDI, {num(lastCdi(d), 4)}% ao dia útil.</p>
       </Card>
 
+      {serie.length > 1 && (
+        <>
+          <Section>Últimos dias</Section>
+          <Card>
+            <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 text-[12px] text-ink3 pb-1 border-b border-line"><span>Dia</span><span className="text-right">Valor bruto</span><span className="text-right">Subiu</span></div>
+            <div className="divide-y divide-line">
+              {serie.slice(-9).map((p, i, arr) => {
+                const ant = i ? arr[i - 1].bruto : serie[Math.max(0, serie.length - 10)].bruto;
+                const sub = p.bruto - ant;
+                return (
+                  <div key={p.date} className="grid grid-cols-[1fr_auto_auto] gap-x-4 py-2 text-[14px]">
+                    <span className="text-ink2">{dataBR(p.date).slice(0, 5)}{p.date === hoje ? " · hoje" : ""}</span>
+                    <Money v={p.bruto} className="text-right" />
+                    <span className={`text-right num ${sub > 0 ? "text-ok" : "text-ink3"}`}>{sub > 0 ? "+" : ""}{brl(sub)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[12px] text-ink3 mt-2">O CDB só rende em dia útil, e o rendimento de um dia entra no dia seguinte: por isso hoje, sábado e domingo ficam sem subir.</p>
+          </Card>
+        </>
+      )}
+
       <Section>Crescimento</Section>
       <Segmented value={meses} onChange={setMeses} options={[{ value: "6", label: "6 meses" }, { value: "12", label: "1 ano" }, { value: "24", label: "2 anos" }, { value: "60", label: "5 anos" }]} />
       <Card className="mt-3">

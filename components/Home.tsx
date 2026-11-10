@@ -7,7 +7,7 @@ import { computeScenarios } from "@/lib/projections";
 import { byCategory, cumulative, envelopes, ofMonth, variableSpend } from "@/lib/stats";
 import { billPaid, categoryTable, priceChanges, recurringSuggestions, safeToSpend } from "@/lib/insights";
 import { saveBackup } from "@/lib/backup";
-import { billActive, cardDebt, cdbNet, receivablesOpen, cdbPerDay, dismissRecurring, fatherBalance, monthKey, myMoney, parcela, projectionInput, toggleBillPaid, update, useData } from "@/lib/store";
+import { billActive, cdbNet, changesSinceBackup, moneyParts, cdbPerDay, dismissRecurring, fatherBalance, monthKey, myMoney, parcela, projectionInput, toggleBillPaid, update, useData } from "@/lib/store";
 import type { Data, Tx } from "@/lib/types";
 import { CategoryBars, CategoryDonut, CumulativeChart, type CatDatum } from "./charts";
 import { TxList, TxRow, TxSheet } from "./Tx";
@@ -28,7 +28,8 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
 
   const pai = fatherBalance(d);
   const account = d.config.accountBalance;
-  const meu = myMoney(d);
+  const parts = moneyParts(d);
+  const meu = parts.total;
   const teto = useMemo(() => Math.max(0, computeScenarios(projectionInput(d))[0].monthlyVariable), [d]);
   const monthTxs = ofMonth(d.txs, month);
   const spent = variableSpend(monthTxs);
@@ -53,10 +54,11 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
   const tabela = useMemo(() => categoryTable(d.txs, month), [d.txs, month]);
   const abrirCat = (k: string) => (k === "__outros" ? setTodas(true) : setCat(k));
   const livre = isNow ? safeToSpend(d, teto) : null;
+  const alteracoes = changesSinceBackup();
   const backupDias = d.lastBackup ? Math.floor((Date.now() - Date.parse(d.lastBackup)) / 86400000) : null;
   const alertas = isNow ? envelopes(d, month, teto).filter((e) => e.budget > 0 && e.spent >= e.budget * (d.config.prefs.alertPct / 100)) : [];
 
-  const recent = [...d.txs].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 5);
+  const recent = [...d.txs].filter((t) => t.category !== "pay_card").sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 5);
   const spentDiff = prevSpent ? Math.round(((spent - prevSpent) / prevSpent) * 100) : null;
 
   return (
@@ -69,12 +71,12 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
         <span className="w-11 h-11 shrink-0 rounded-full bg-brand text-onbrand grid place-items-center font-bold">{(d.config.prefs.name || "?").slice(0, 2).toUpperCase()}</span>
       </header>
 
-      {(backupDias === null || backupDias > d.config.prefs.backupDays) && d.txs.length > 0 && (
+      {d.txs.length > 0 && alteracoes > 0 && (backupDias === null || backupDias >= d.config.prefs.backupDays || alteracoes >= 10) && (
         <Card className="mb-3 flex items-center gap-3 !py-3">
           <span className="text-xl" aria-hidden>💾</span>
           <span className="flex-1 text-[14px]">
-            <span className="block font-semibold">{backupDias === null ? "Você nunca salvou backup" : `Último backup há ${backupDias} dias`}</span>
-            <span className="block text-ink3">Se o iPhone apagar o app, tudo some.</span>
+            <span className="block font-semibold">{backupDias === null ? "Você nunca salvou backup" : `Último backup há ${backupDias} dia${backupDias === 1 ? "" : "s"}`}</span>
+            <span className="block text-ink3">{alteracoes} alteraç{alteracoes === 1 ? "ão" : "ões"} ainda fora do backup.</span>
           </span>
           <Button tone="primary" className="!h-9 !px-3 text-[14px]" onClick={async () => (await saveBackup()) && toast("Backup salvo")}>Salvar</Button>
         </Card>
@@ -82,7 +84,7 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
 
       <div className="hero card p-5 text-center">
         <div className="flex items-center justify-center gap-2 text-white/70 text-[14px]">
-          Meu dinheiro
+          Meu dinheiro total
           <button aria-label={hidden ? "Mostrar valores" : "Esconder valores"} onClick={() => setHidden(!hidden)} className="text-white/70">
             {hidden ? Icons.eyeOff : Icons.eye}
           </button>
@@ -94,45 +96,43 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
           {staleDays !== null && staleDays > 7 ? " ⚠︎" : ""}
         </div>
 
-        {cardDebt(d) > 0 && (
-          <div className="text-[13px] text-white/80 mt-1">
-            já descontada a fatura do cartão em aberto: −<Money v={cardDebt(d)} />
-          </div>
-        )}
-
-        {d.config.prefs.countReceivables && receivablesOpen(d) > 0 && (
-          <div className="text-[13px] text-white/80">
-            inclui <Money v={receivablesOpen(d)} /> que te devem
-          </div>
-        )}
-
         {/* A conta fatiada: quanto ali é seu e quanto é do pai */}
         <SplitBar account={account} pai={pai} />
 
         <div className="grid grid-cols-2 gap-3 mt-4 text-left">
           <div className="rounded-xl bg-white/10 p-3">
-            <div className="text-[12px] text-white/70">Na conta é seu</div>
-            <Money v={pai < 0 ? account : account - pai} className="font-bold" />
+            <div className="text-[12px] text-white/70">Disponível agora</div>
+            <Money v={parts.disponivel} className="font-bold" />
+            <div className="text-[12px] text-white/70">
+              na conta, só seu{parts.fatura > 0 ? <>, já sem a fatura de <Money v={parts.fatura} /></> : ""}
+            </div>
           </div>
-          <button onClick={goCdb} className="rounded-xl bg-white/10 p-3 text-left block w-full">
+          <button onClick={goCdb} className="rounded-xl bg-white/10 p-3 text-left block w-full min-w-0">
             <div className="text-[12px] text-white/70">CDB {d.config.cdb.pctCdi ? `· ${d.config.cdb.pctCdi}% CDI` : ""}</div>
-            <Money v={cdb.bruto} className="font-bold" />
-            {cdb.ir > 0 && (
-              <div className="text-[12px] text-white/70">
-                líquido <Money v={cdb.liquido} /> <span className="whitespace-nowrap">(IR {cdb.aliquota.toLocaleString("pt-BR")}%)</span>
-              </div>
-            )}
+            <Money v={cdb.liquido} className="font-bold" />
+            <div className="text-[12px] text-white/70">
+              líquido de IR · bruto <Money v={cdb.bruto} />
+            </div>
             {perDay > 0 && (
               <div className="text-[12px] text-white/70">
                 rende <Money v={perDay} />/dia útil
               </div>
             )}
-            {d.config.rendaFixaDate && cdb.bruto > d.config.rendaFixa && (
-              <div className="text-[12px] text-white/70">
-                +<Money v={cdb.bruto - d.config.rendaFixa} /> desde {d.config.rendaFixaDate.slice(8, 10)}/{d.config.rendaFixaDate.slice(5, 7)}
-              </div>
-            )}
           </button>
+          {parts.aReceber > 0 && (
+            <div className="rounded-xl bg-white/10 p-3 col-span-2">
+              <div className="text-[12px] text-white/70">A receber</div>
+              <Money v={parts.aReceber} className="font-bold" />
+              <div className="text-[12px] text-white/70">
+                {[parts.doPai > 0 ? <span key="p">seu pai te deve <Money v={parts.doPai} /></span> : null,
+                  parts.pessoas > 0 ? <span key="o">outras pessoas <Money v={parts.pessoas} /></span> : null]
+                  .filter(Boolean).reduce<React.ReactNode[]>((acc, x, i) => (i ? [...acc, " · ", x] : [x]), [])}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="text-[12px] text-white/60 mt-3">
+          Total = disponível + CDB líquido{parts.aReceber > 0 ? " + a receber" : ""}.
         </div>
       </div>
 

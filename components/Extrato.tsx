@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { catIcon, catName, isFathers } from "@/lib/categories";
 import { normalize } from "@/lib/classifier";
-import { monthName } from "@/lib/format";
+import { brl, monthName } from "@/lib/format";
 import { ofMonth } from "@/lib/stats";
 import { monthKey, useData } from "@/lib/store";
 import type { Tx } from "@/lib/types";
@@ -25,6 +25,11 @@ export default function Extrato({ month, setMonth, filter, setFilter }: {
   const busca = q.trim();
   const todosMeses = filter === "review" || !!busca || !!cat;
   let txs = filter === "review" ? d.txs.filter((t) => t.review) : todosMeses ? d.txs : ofMonth(d.txs, month);
+  // Compra no cartão não saiu da conta: o que saiu foi o pagamento da fatura. Para não parecer
+  // cobrança dupla, as compras ficam só no filtro Cartão (e na busca e na revisão).
+  const soConta = filter !== "card" && filter !== "review" && !busca && !cat;
+  const doCartao = (filter === "review" || filter === "card" ? [] : ofMonth(d.txs, month)).filter((t) => t.card);
+  if (soConta) txs = txs.filter((t) => !t.card);
   if (filter === "mine") txs = txs.filter((t) => !isFathers(t.category));
   if (filter === "pai") txs = txs.filter((t) => isFathers(t.category));
   if (filter === "card") txs = txs.filter((t) => t.card);
@@ -69,11 +74,26 @@ export default function Extrato({ month, setMonth, filter, setFilter }: {
         ]}
       />
 
-      <Card className="mt-3 grid grid-cols-3 gap-1 text-center text-[clamp(12px,3.8vw,16px)]">
-        <div><div className="text-[13px] text-ink3">Entrou</div><Money v={inflow} className="text-ok font-semibold" /></div>
-        <div><div className="text-[13px] text-ink3">Saiu</div><Money v={-outflow} className="font-semibold" /></div>
-        <div><div className="text-[13px] text-ink3">Resultado</div><Money v={inflow + outflow} signed className="font-semibold" /></div>
-      </Card>
+      {filter === "card" ? (
+        <Card className="mt-3">
+          <div className="text-[13px] text-ink3">Compras no cartão</div>
+          <Money v={-outflow} className="text-[22px] font-bold" />
+          <div className="text-[13px] text-ink2 mt-1">
+            Elas já estão na fatura. O que sai da conta é o pagamento da fatura, que aparece em Tudo. Aqui você só classifica cada compra.
+          </div>
+        </Card>
+      ) : (
+        <Card className="mt-3 grid grid-cols-3 gap-1 text-center text-[clamp(12px,3.8vw,16px)]">
+          <div><div className="text-[13px] text-ink3">Entrou</div><Money v={inflow} className="text-ok font-semibold" /></div>
+          <div><div className="text-[13px] text-ink3">Saiu</div><Money v={-outflow} className="font-semibold" /></div>
+          <div><div className="text-[13px] text-ink3">Resultado</div><Money v={inflow + outflow} signed className="font-semibold" /></div>
+        </Card>
+      )}
+      {soConta && doCartao.length > 0 && (
+        <button onClick={() => setFilter("card")} className="w-full text-left text-[13px] text-ink3 px-1 mt-2">
+          {doCartao.length} compra{doCartao.length === 1 ? "" : "s"} no cartão ({brl(-doCartao.reduce((s, t) => s + t.amount, 0))}) não entram nas somas: já estão no pagamento da fatura. <span className="text-link font-semibold">Ver em Cartão ›</span>
+        </button>
+      )}
 
       <div className="mt-4">
         {txs.length ? (
