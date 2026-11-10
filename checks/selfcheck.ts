@@ -642,3 +642,16 @@ console.log("saldo e partes ok");
   assert.ok(ics.includes("Ênfase: Ombro\\nSupino na máquina"), "linhas separadas por \n do ICS");
 }
 console.log("treino em 3 divisões ok");
+{
+  // ---- CDI do Banco Central: 404 "não encontrado" é "nada novo", não falta de internet ----
+  const { interpretaCdi } = require("../lib/cdi") as typeof import("../lib/cdi");
+  const vazio = interpretaCdi(404, '{"erro":{"statusCode":404,"detail":"SGSNegocioException: Value(s) not found"}}');
+  assert.equal(vazio.ok, true, "período sem dia publicado não é erro");
+  assert.deepEqual(vazio.dias, {});
+  const ok = interpretaCdi(200, '[{"data":"05/11/2026","valor":"0.050788"},{"data":"06/11/2026","valor":"0.050788"}]');
+  assert.deepEqual([ok.ok, ok.dias["2026-11-05"], Object.keys(ok.dias).length], [true, 0.050788, 2]);
+  assert.equal(interpretaCdi(503, "").ok, false, "fora do ar é erro");
+  assert.equal(interpretaCdi(200, "<html>").ok, false, "resposta estranha é erro");
+  assert.ok(/fora do ar/.test(interpretaCdi(500, "").msg));
+}
+console.log("cdi bcb ok");

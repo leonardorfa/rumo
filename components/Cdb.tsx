@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { cdbProjecao, cdbRende, cdbSerie, proximaFaixa, registrarCdb } from "@/lib/cdb";
-import { refreshCdi } from "@/lib/cdi";
+import { cdiStatus, refreshCdi } from "@/lib/cdi";
 import { brl, brl0, localDay } from "@/lib/format";
 import { cdbNet, cdbPrincipalNow, conferirCdb, lastCdi, rendaFixaNow, useData } from "@/lib/store";
 import { TrendChart } from "./charts";
@@ -18,6 +18,8 @@ export default function Cdb() {
   const n = cdbNet(d);
   const [sheet, setSheet] = useState<null | "conferir" | "aplicar" | "resgatar" | "pct" | "data">(null);
   const [meses, setMeses] = useState("12");
+  const [buscando, setBuscando] = useState(false);
+  const ult = cdiStatus();
   const [aporte, setAporte] = useState("");
   const hoje = localDay();
   const principal = cdbPrincipalNow(d);
@@ -161,11 +163,12 @@ export default function Cdb() {
         <div className="py-3 border-t border-line flex items-start justify-between gap-3">
           <span>
             <span className="block">Banco Central</span>
-            <span className="block text-[13px] text-ink3">{ultimoCdi ? `CDI atualizado até ${dataBR(ultimoCdi).slice(0, 5)}${cdiOk ? "" : ". Sem conexão há dias: usando a última taxa."}` : "Ainda não buscou: abra o app com internet."}</span>
+            <span className="block text-[13px] text-ink3">{ultimoCdi ? `CDI atualizado até ${dataBR(ultimoCdi).slice(0, 5)}${cdiOk ? "" : ". Faz dias que não chega taxa nova: usando a última."}` : "Ainda não buscou: abra o app com internet."}</span>
+            {ult && <span className={`block text-[12px] ${ult.ok ? "text-ink3" : "text-alert"}`}>Última busca {new Date(ult.t).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}: {ult.msg}</span>}
           </span>
           <span className={cdiOk ? "text-ok" : "text-alert"}>{cdiOk ? "✓" : "⚠︎"}</span>
         </div>
-        <button className="w-full text-left py-3 border-t border-line text-link font-semibold" onClick={async () => { toast((await refreshCdi(true)) ? "CDI atualizado" : "Não consegui buscar agora"); }}>Buscar o CDI agora</button>
+        <button className="w-full text-left py-3 border-t border-line text-link font-semibold" disabled={buscando} onClick={async () => { setBuscando(true); const r = await refreshCdi(true); setBuscando(false); toast(r.msg); }}>{buscando ? "Buscando…" : "Buscar o CDI agora"}</button>
       </div>
 
       {(moves.length > 0 || checks.length > 0) && (
