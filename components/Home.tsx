@@ -124,9 +124,9 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
           </button>
           {parts.paiGuardado > 0 && (
             <button onClick={goPai} className="rounded-xl bg-white/10 p-3 col-span-2 text-left">
-              <div className="text-[12px] text-white/70">Dinheiro do seu pai na conta</div>
+              <div className="text-[12px] text-white/70">Você deve ao seu pai</div>
               <Money v={parts.paiGuardado} className="font-bold" />
-              <div className="text-[12px] text-white/70">não é seu: fica fora do total</div>
+              <div className="text-[12px] text-white/70">está na sua conta, mas é dele: fica fora do total</div>
             </button>
           )}
           {parts.aReceber > 0 && (

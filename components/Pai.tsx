@@ -12,8 +12,8 @@ import { Button, Card, Money, MonthSwitcher, Section, Segmented, Sheet, Title, t
 
 type Mode = "in" | "out" | "set" | null;
 const MODE_TEXT = {
-  in: { title: "Pai me passou", hint: "Dinheiro dele que entrou na sua conta. Soma ao crédito." },
-  out: { title: "Usei para o pai", hint: "Pagou algo dele. Se passar de zero, ele fica te devendo." },
+  in: { title: "Ele me passou dinheiro", hint: "Seu pai te mandou dinheiro. Isso aumenta o que você deve a ele." },
+  out: { title: "Paguei algo dele", hint: "Você pagou uma coisa dele com o seu dinheiro. Isso diminui o que você deve a ele; se passar, ele passa a te dever." },
   set: { title: "Definir saldo", hint: "Valor exato do crédito agora. Negativo = ele te deve." },
 };
 
@@ -47,15 +47,15 @@ export default function Pai({ month, setMonth }: { month: string; setMonth: (m: 
       )}
       <Card>
         <div className="text-ink2 text-[15px]">
-          {bal > 0 ? "Você está com dinheiro do pai" : bal < 0 ? "Seu pai te deve" : "Vocês estão quites"}
+          {bal > 0 ? "Você deve ao seu pai" : bal < 0 ? "Seu pai te deve" : "Vocês estão quites"}
         </div>
         <Money v={Math.abs(bal)} className="block text-[40px] leading-tight font-bold text-pai" />
         <div className="text-[13px] text-ink3">
-          {bal > 0 ? "Esse valor está na sua conta mas não é seu." : bal < 0 ? "Esse valor soma ao seu dinheiro." : "Crédito zerado."}
+          {bal > 0 ? "Esse valor está na sua conta, mas é dele." : bal < 0 ? "Esse valor soma ao seu dinheiro." : "Crédito zerado."}
         </div>
         <div className="grid grid-cols-3 gap-2 mt-4">
-          <Button onClick={() => setMode("in")}>+ Recebi</Button>
-          <Button onClick={() => setMode("out")}>− Usei</Button>
+          <Button onClick={() => setMode("in")}>Ele me passou</Button>
+          <Button onClick={() => setMode("out")}>Paguei por ele</Button>
           <Button onClick={() => setMode("set")}>Definir</Button>
         </div>
       </Card>
@@ -129,7 +129,7 @@ function MoveSheet({ mode, current, onClose }: { mode: Exclude<Mode, null>; curr
   const [value, setValue] = useState(mode === "set" ? String(Math.abs(current)).replace(".", ",") : "");
   const [desc, setDesc] = useState("");
   // "Definir" sem sinal de menos: você diz quem deve a quem e o valor
-  const [lado, setLado] = useState<"guardo" | "deve">(current < 0 ? "deve" : "guardo");
+  const [lado, setLado] = useState<"devo" | "deve">(current < 0 ? "deve" : "devo");
   const n = parseFloat(value.replace(/\./g, "").replace(",", "."));
 
   function save() {
@@ -145,9 +145,9 @@ function MoveSheet({ mode, current, onClose }: { mode: Exclude<Mode, null>; curr
       <p className="text-ink2 mb-3">{mode === "set" ? "Diga como está agora entre você e seu pai." : MODE_TEXT[mode].hint}</p>
       {mode === "set" && (
         <>
-          <Segmented value={lado} onChange={setLado} options={[{ value: "guardo", label: "Guardo dinheiro dele" }, { value: "deve", label: "Ele me deve" }]} />
+          <Segmented value={lado} onChange={setLado} options={[{ value: "devo", label: "Eu devo a ele" }, { value: "deve", label: "Ele me deve" }]} />
           <p className="text-[13px] text-ink3 px-1 mt-2 mb-3">
-            {lado === "deve" ? "Esse valor é seu: entra no “meu dinheiro”, em “a receber”." : "Esse valor está na sua conta, mas é dele: não entra no “meu dinheiro”."}
+            {lado === "deve" ? "Ele me deve: esse valor é seu e entra no “meu dinheiro”, em “a receber”." : "Eu devo a ele: esse valor está na sua conta mas é dele, e não entra no “meu dinheiro”."}
           </p>
         </>
       )}
