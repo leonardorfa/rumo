@@ -20,7 +20,7 @@
   --line: #dfe6f1;
   --ink: #05183c;
   --ink2: #46566f;
-  --ink3: #7d8aa0;
+  --ink3: #66748b;
   --brand: #06296b;
   --link: #06296b; /* azul da marca como texto */
   --on-brand: #ffffff;
@@ -42,8 +42,8 @@
     --fill: #171c28;
     --line: #202739;
     --ink: #eaf0fa;
-    --ink2: #9aa8c0;
-    --ink3: #6e7c95;
+    --ink2: #adb9cd;
+    --ink3: #8896ae;
     --brand: #1a3c7d;
     --link: #8db4f2; /* #1a3c7d como texto some no fundo escuro */
     --on-brand: #ffffff;
@@ -64,8 +64,8 @@
   --fill: #171c28;
   --line: #202739;
   --ink: #eaf0fa;
-  --ink2: #9aa8c0;
-  --ink3: #6e7c95;
+  --ink2: #adb9cd;
+  --ink3: #8896ae;
   --brand: #1a3c7d;
   --link: #8db4f2;
   --on-brand: #ffffff;
@@ -159,14 +159,19 @@ button:focus-visible {
   padding-bottom: calc(160px + env(safe-area-inset-bottom)); /* barra de abas + botões flutuantes */
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .sheet-in {
-    animation: sheet-in 0.22s ease-out;
-  }
-  @keyframes sheet-in {
-    from {
-      transform: translateY(24px);
-      opacity: 0;
-    }
-  }
-}
+/* janelas: abrem expandindo de baixo e fecham encolhendo */
+@keyframes sheet-in { from { transform: translateY(46px) scale(.94); opacity: 0; } }
+@keyframes sheet-out { to { transform: translateY(60px) scale(.94); opacity: 0; } }
+@keyframes scrim-in { from { opacity: 0; } }
+@keyframes scrim-out { to { opacity: 0; } }
+.anim .sheet-in { animation: sheet-in .34s cubic-bezier(.2,.85,.25,1) both; transform-origin: 50% 100%; }
+.anim .sheet-scrim { animation: scrim-in .26s ease-out both; }
+.anim .sheet-leaving .sheet-in, .sheet-ghost .sheet-in { animation: sheet-out .24s cubic-bezier(.5,0,.9,.6) both !important; }
+.anim .sheet-leaving .sheet-scrim, .sheet-ghost .sheet-scrim { animation: scrim-out .24s ease-in both !important; }
+
+/* áreas que expandem e recolhem */
+.collapse { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; }
+.collapse > div { overflow: hidden; min-height: 0; }
+.collapse[data-open="true"] { grid-template-rows: 1fr; opacity: 1; visibility: visible; }
+.anim .collapse { transition: grid-template-rows .34s cubic-bezier(.2,.8,.2,1), opacity .26s ease, visibility 0s linear .34s; }
+.anim .collapse[data-open="true"] { transition: grid-template-rows .34s cubic-bezier(.2,.8,.2,1), opacity .26s ease, visibility 0s; }

@@ -278,6 +278,39 @@ export function weeklyVolume(d: Data, n = 8, now = new Date()) {
   });
 }
 
+export const GRUPOS = ["Peito", "Ombro", "Tríceps", "Costas", "Bíceps", "Perna", "Abdômen", "Outros"] as const;
+// Ordem importa: "crucifixo inverso" é ombro, então vem antes de "crucifixo".
+const REGRAS: [RegExp, string][] = [
+  [/inverso|ombro|desenvolvimento|eleva[cç][aã]o|face pull|encolhimento/i, "Ombro"],
+  [/tr[ií]ceps|mergulho|paralela/i, "Tríceps"],
+  [/b[ií]ceps|rosca/i, "Bíceps"],
+  [/supino|crucifixo|peck|flex[aã]o de bra|peito|voador/i, "Peito"],
+  [/puxada|remada|barra fixa|pulldown|costas|serrote|levantamento terra/i, "Costas"],
+  [/leg|cadeira|agachamento|panturrilha|stiff|afundo|g[eê]meos|gl[uú]teo|perna|avan[cç]o|hack/i, "Perna"],
+  [/abdominal|prancha|core|abd[oô]men/i, "Abdômen"],
+];
+/** Grupo muscular de um exercício: o que você escolheu, senão pelo nome. */
+export function grupoDe(d: Data, ex: string): string {
+  const mine = fitOf(d).exGroups?.[ex];
+  if (mine) return mine;
+  return REGRAS.find(([re]) => re.test(ex))?.[1] ?? "Outros";
+}
+/** Grupo de uma rotina: o escolhido, senão o que mais aparece nos exercícios. */
+export function grupoDaRotina(d: Data, r: Routine): string {
+  if (r.group) return r.group;
+  const n = new Map<string, number>();
+  for (const e of r.exercises) n.set(grupoDe(d, e), (n.get(grupoDe(d, e)) ?? 0) + 1);
+  return [...n.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Outros";
+}
+export function setExGroup(d: Data, ex: string, g: string): Data {
+  return setFit(d, { exGroups: { ...fitOf(d).exGroups, [ex]: g } });
+}
+/** Agrupa na ordem de GRUPOS, sem grupos vazios. */
+export function agrupar<T>(itens: T[], grupo: (x: T) => string): { grupo: string; itens: T[] }[] {
+  return [...GRUPOS, ...new Set(itens.map(grupo))].filter((g, i, a) => a.indexOf(g) === i)
+    .map((g) => ({ grupo: g, itens: itens.filter((x) => grupo(x) === g) })).filter((x) => x.itens.length);
+}
+
 export const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 export const SUGESTOES = [
   // peito

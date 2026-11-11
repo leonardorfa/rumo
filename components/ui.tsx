@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { brl, brlSigned, monthName, shiftMonth } from "@/lib/format";
-import { useAnim } from "@/lib/anim";
+import { animOn, useAnim } from "@/lib/anim";
 import { getData, setData, update } from "@/lib/store";
 import type { Data } from "@/lib/types";
 
@@ -146,6 +146,30 @@ export function Button({ children, onClick, tone = "fill", className = "", disab
 export function Sheet({ open, onClose, title, children }: {
   open: boolean; onClose: () => void; title: string; children: React.ReactNode;
 }) {
+  // Saída animada: com `open` virando falso a janela fica um instante a mais, encolhendo.
+  // Quando quem usa tira a janela da tela de uma vez (`{x && <Sheet/>}`), a saída vem de uma cópia
+  // que fica por cima só enquanto encolhe.
+  const raiz = useRef<HTMLDivElement>(null);
+  const [mostrando, setMostrando] = useState(open);
+  const [saindo, setSaindo] = useState(false);
+  useEffect(() => {
+    if (open) { setMostrando(true); setSaindo(false); return; }
+    if (!mostrando) return;
+    if (!animOn()) { setMostrando(false); return; }
+    setSaindo(true);
+    const t = setTimeout(() => { setMostrando(false); setSaindo(false); }, 240);
+    return () => clearTimeout(t);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => () => {
+    const el = raiz.current;
+    if (!el || !animOn()) return;
+    const copia = el.cloneNode(true) as HTMLElement;
+    copia.classList.add("sheet-ghost");
+    copia.style.pointerEvents = "none";
+    copia.removeAttribute("role");
+    document.body.appendChild(copia);
+    setTimeout(() => copia.remove(), 300);
+  }, []);
   // O teclado do iPhone não encolhe a página: a folha ficava por trás dele e escondia o campo.
   // Acompanha a área realmente visível (visualViewport) e leva o campo focado para o meio.
   const [vv, setVv] = useState<{ h: number; top: number } | null>(null);
@@ -164,15 +188,15 @@ export function Sheet({ open, onClose, title, children }: {
       v?.removeEventListener("scroll", sync);
     };
   }, [open, onClose]);
-  if (!open) return null;
+  if (!open && !mostrando) return null;
   return (
-    <div className="fixed left-0 right-0 z-50 flex items-end justify-center" role="dialog" aria-modal aria-label={title}
+    <div ref={raiz} className={`fixed left-0 right-0 z-50 flex items-end justify-center ${saindo ? "sheet-leaving" : ""}`} role="dialog" aria-modal aria-label={title}
       style={vv ? { top: vv.top, height: vv.h } : { top: 0, bottom: 0 }}
       onFocusCapture={(e) => {
         const el = e.target as HTMLElement;
         if (/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
       }}>
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="sheet-scrim absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="sheet-in relative w-full max-w-[480px] overflow-y-auto bg-bg rounded-t-3xl px-4 pt-2"
         style={{ maxHeight: vv ? `${Math.min(vv.h - 8, vv.h * 0.94)}px` : "88vh", paddingBottom: "calc(20px + env(safe-area-inset-bottom))" }}>
         <div className="mx-auto mt-1 mb-3 h-1.5 w-10 rounded-full bg-line" />
@@ -182,6 +206,25 @@ export function Sheet({ open, onClose, title, children }: {
         </div>
         {children}
       </div>
+    </div>
+  );
+}
+
+/** Área que expande e recolhe com animação (a altura anima de verdade, sem pular). */
+export function Collapse({ open, children }: { open: boolean; children: React.ReactNode }) {
+  return <div className="collapse" data-open={open} aria-hidden={!open}><div>{children}</div></div>;
+}
+
+/** Título que abre e fecha uma área. */
+export function Expandir({ titulo, children, aberto = false, className = "" }: { titulo: React.ReactNode; children: React.ReactNode; aberto?: boolean; className?: string }) {
+  const [on, setOn] = useState(aberto);
+  return (
+    <div className={className}>
+      <button onClick={() => setOn(!on)} aria-expanded={on} className="w-full flex items-center justify-between text-link font-semibold py-1 text-left">
+        <span>{titulo}</span>
+        <span aria-hidden className="inline-block transition-transform duration-300" style={{ transform: on ? "rotate(180deg)" : "none" }}>⌄</span>
+      </button>
+      <Collapse open={on}>{children}</Collapse>
     </div>
   );
 }

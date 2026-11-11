@@ -4,14 +4,14 @@ import { useMemo, useState } from "react";
 import { brl0, dayLabel, daysInMonth, monthName, shiftMonth } from "@/lib/format";
 import { forecast30, netWorthHistory, runway, savingsRate } from "@/lib/insights";
 import { buildMonthlyProjection, computeScenarios, monthsToGoal, type ProjectionInput, type ScenarioResult } from "@/lib/projections";
-import { envelopes } from "@/lib/stats";
+import { envelopes, ofMonth, variableSpend } from "@/lib/stats";
 import { catIcon, catName, pickerGroups } from "@/lib/categories";
 import { categoryAverages, deleteEnvelope, envelopeBudgets, envelopesFromHistory, saveEnvelope, setAreaFromNow, monthKey, myMoney, projectionInput, resetEnvelopes, setEnvelopeAmount, update, useData } from "@/lib/store";
 import type { Data, Envelope } from "@/lib/types";
 import { ForecastChart, ProjectionChart } from "./charts";
 import Vida from "./Vida";
 import { Partes } from "./Partes";
-import { act, Button, Card, Money, MonthSwitcher, Progress, Section, Segmented, Sheet, Title, toast } from "./ui";
+import { act, Button, Card, Expandir, Money, MonthSwitcher, Progress, Section, Segmented, Sheet, Title, toast } from "./ui";
 
 export default function Metas() {
   const d = useData();
@@ -85,6 +85,9 @@ export default function Metas() {
         <Partes />
       </Card>
 
+      <Section>Limite do mês</Section>
+      <LimiteMes teto={teto} spent={variableSpend(ofMonth(d.txs, now))} input={input} />
+
       <Section>Quanto posso gastar</Section>
       <Segmented
         value={key}
@@ -102,14 +105,12 @@ export default function Metas() {
             <Money v={s.weeklyBudget} className="text-[22px] font-bold block truncate" />
           </div>
         </div>
-        <div className="text-[13px] text-ink2 mt-1">{s.description}</div>
         <div className="mt-3"><ProjectionChart data={chart} goal={goal} /></div>
         <div className={`flex items-center gap-2 mt-2 text-[15px] ${s.hitsGoal ? "text-ok" : "text-alert"}`}>
           <span aria-hidden>{s.hitsGoal ? "✓" : "⚠︎"}</span>
           <span>{s.hitsGoal ? "Bate a meta" : "Não bate a meta"}: fecha {deadline} com <Money v={s.finalBalance} /></span>
         </div>
-        <details className="mt-3 text-[15px]">
-          <summary className="text-meu cursor-pointer">Ver mês a mês</summary>
+        <Expandir className="mt-3 text-[15px]" titulo="Ver mês a mês">
           <div className="divide-y divide-line mt-2">
             {s.months.map((m) => (
               <div key={m.label} className="flex justify-between py-2">
@@ -118,7 +119,7 @@ export default function Metas() {
               </div>
             ))}
           </div>
-        </details>
+        </Expandir>
       </Card>
 
       <label className="flex items-center justify-between bg-card rounded-2xl px-4 py-3 mt-3 gap-3">
@@ -493,5 +494,47 @@ function MetaInviavel({ input, ritmo, deadline, curto }: { input: ProjectionInpu
       )}
       <p className="text-[13px] text-ink3 mt-2">Ajuste a meta ou o prazo em Mais → Ajustes → Renda e meta.</p>
     </div>
+  );
+}
+
+/** Barra do limite do mês e, por baixo, a conta que levou até ele. */
+function LimiteMes({ teto, spent, input }: { teto: number; spent: number; input: ProjectionInput }) {
+  const pct = teto ? Math.round((spent / teto) * 100) : spent > 0 ? 100 : 0;
+  const sobra = teto - spent;
+  const diasRest = daysInMonth(monthKey()) - new Date().getDate() + 1;
+  const saldoMais = input.effectiveBalance + (input.spentThisMonth ?? 0);
+  const salarios = (input.remainingMonths - (input.skipFirstMonthSalary ? 1 : 0)) * input.salary;
+  const cdb = Math.max(0, input.remainingMonths - 1) * (input.cdbMonthly ?? 0);
+  const fixas = input.remainingMonths * input.fixedCosts - (input.paidFixedThisMonth ?? 0);
+  const extras = input.specialExpenses.reduce((a, e) => a + e.amount, 0);
+  const sobraTotal = saldoMais + salarios + cdb - fixas - extras - input.goalAmount;
+  const linha = (nome: string, v: number, sinal: "+" | "−" | "") => (
+    <div className="flex justify-between py-1.5">
+      <span className="text-ink2">{sinal} {nome}</span><Money v={v} />
+    </div>
+  );
+  return (
+    <Card>
+      <Progress value={Math.min(100, pct)} max={100} color={spent > teto ? "var(--alert)" : "var(--meu)"} />
+      <div className="flex justify-between mt-2 text-[15px]">
+        <span>Gastou <Money v={spent} /></span>
+        <span className={spent > teto ? "text-alert font-semibold" : "text-ink2"}>{pct}% de <Money v={teto} /></span>
+      </div>
+      <div className={`text-[14px] mt-1 ${sobra < 0 ? "text-alert" : "text-ink2"}`}>
+        {sobra >= 0 ? <>Sobram <Money v={sobra} /> neste mês{diasRest > 0 ? <> (<Money v={sobra / diasRest} /> por dia)</> : null}.</> : <>Passou <Money v={-sobra} /> do limite.</>}
+      </div>
+      <Expandir className="mt-2 text-[15px]" titulo="Como o limite é calculado">
+        <div className="divide-y divide-line mt-1 text-[15px]">
+          {linha("Seu dinheiro hoje (mais o já gasto no mês)", saldoMais, "")}
+          {linha(`Salários que ainda entram (${input.remainingMonths - (input.skipFirstMonthSalary ? 1 : 0)}x)`, salarios, "+")}
+          {cdb > 0 && linha("Rendimento do CDB, já sem IR", cdb, "+")}
+          {linha("Contas fixas e parcelas até o prazo", fixas, "−")}
+          {extras > 0 && linha("Gastos extras previstos", extras, "−")}
+          {linha("Meta que você quer guardar", input.goalAmount, "−")}
+          <div className="flex justify-between py-1.5 font-semibold"><span>= Sobra para gastar</span><Money v={sobraTotal} /></div>
+          <div className="flex justify-between py-1.5 font-semibold"><span>÷ {input.remainingMonths} meses = limite por mês</span><Money v={teto} /></div>
+        </div>
+      </Expandir>
+    </Card>
   );
 }

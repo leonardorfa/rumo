@@ -952,6 +952,8 @@ export function projectionInput(d: Data, now = new Date()): ProjectionInput {
     paidFixedThisMonth: c.bills.filter((b) => !b.atSource && !b.until && billPaid(d, b, mes)).reduce((s, b) => s + b.amount, 0),
     recentAvg: recentVariableAvg(d, mes),
     economyPct: c.prefs?.economyPct ?? 30,
+    // CDB rende todo mês: ~21 dias úteis, já sem IR
+    cdbMonthly: Math.floor(cdbPerDay(d) * 21 * (1 - cdbNet(d, now).aliquota / 100)),
   };
 }
 

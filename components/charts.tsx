@@ -13,6 +13,8 @@ const axis = { fill: "var(--ink3)", fontSize: 11 };
 const tip = {
   contentStyle: { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, fontSize: 13, color: "var(--ink)" },
   labelStyle: { color: "var(--ink2)" },
+  // sem isso a biblioteca pinta o texto de preto (#000) quando a fatia ou a coluna não tem cor própria: some no escuro
+  itemStyle: { color: "var(--ink)" },
 };
 const short = (v: number) =>
   Math.abs(v) >= 1000 ? `${(v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}k` : String(v);
@@ -31,7 +33,7 @@ export function CategoryBars({ data, onSelect }: { data: CatDatum[]; onSelect?: 
       <ResponsiveContainer>
         <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barCategoryGap="22%">
           <CartesianGrid vertical={false} stroke="var(--line)" />
-          <XAxis dataKey="icon" tick={{ fontSize: 16 }} tickLine={false} axisLine={false} interval={0} />
+          <XAxis dataKey="icon" tick={{ fontSize: 16, fill: "var(--ink2)" }} tickLine={false} axisLine={false} interval={0} />
           <YAxis tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 42} tickFormatter={short} />
           {!hidden && <Tooltip {...tip} cursor={{ fill: "var(--fill)" }} formatter={(v: number, _n, p) => [brl(v), (p?.payload as CatDatum)?.name]} labelFormatter={() => ""} />}
           <Bar dataKey="value" radius={[6, 6, 0, 0]} isAnimationActive={animOn()} animationDuration={900} cursor="pointer"

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { brl, localDay } from "@/lib/format";
 import { addReceivable, deleteReceivable, payReceivable, receivableLeft, receivablesOpen, useData } from "@/lib/store";
 import type { Receivable } from "@/lib/types";
-import { act, Button, Card, Money, Sheet } from "./ui";
+import { act, Button, Card, Expandir, Money, Sheet } from "./ui";
 
 const parse = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", "."));
 const dataBR = (iso: string) => new Date(iso + "T12:00:00").toLocaleDateString("pt-BR");
@@ -78,8 +78,7 @@ export function ReceberSheet({ onClose }: { onClose: () => void }) {
       <Button className="w-full" onClick={() => setNovo(true)}>+ Anotar que alguém te deve</Button>
 
       {pagos.length > 0 && (
-        <details className="mt-4">
-          <summary className="text-link font-semibold cursor-pointer px-1">Já pagos ({pagos.length})</summary>
+        <Expandir className="mt-4 px-1" titulo={`Já pagos (${pagos.length})`}>
           <div className="card px-4 mt-2">
             {[...pagos].reverse().map((r, i) => (
               <div key={r.id} className={`flex items-center gap-2 py-2.5 ${i ? "border-t border-line" : ""}`}>
@@ -92,7 +91,7 @@ export function ReceberSheet({ onClose }: { onClose: () => void }) {
               </div>
             ))}
           </div>
-        </details>
+        </Expandir>
       )}
     </Sheet>
   );

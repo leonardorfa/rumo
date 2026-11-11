@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { shareFile } from "@/lib/backup";
 import { localDay } from "@/lib/format";
 import {
-  buildIcs, deleteRoutine, MODELOS, planForDay, setDayExtra, deleteWeight, deleteWorkout, exerciseHistory, fitOf, goalStatus, knownExercises, lastSets, logWeight,
+  agrupar, buildIcs, deleteRoutine, GRUPOS, grupoDaRotina, grupoDe, MODELOS, setExGroup, planForDay, setDayExtra, deleteWeight, deleteWorkout, exerciseHistory, fitOf, goalStatus, knownExercises, lastSets, logWeight,
   recordsOf, saveRoutine, saveWorkout, setTrainingDay, setTrainingTime, SUGESTOES, weekStats, weeklyVolume, weightTrend, WEEKDAYS,
 } from "@/lib/life";
 import { update, useData } from "@/lib/store";
@@ -312,6 +312,7 @@ function preencher(d: ReturnType<typeof useData>, ex: string): Bloco["sets"] {
 function EscolherExercicio({ onPick, onClose }: { onPick: (ex: string) => void; onClose: () => void }) {
   const d = useData();
   const [q, setQ] = useState("");
+  const [gNovo, setGNovo] = useState("");
   const meus = knownExercises(d);
   const outros = SUGESTOES.filter((s) => !meus.some((m) => m.toLowerCase() === s.toLowerCase()));
   const filtra = (xs: string[]) => xs.filter((x) => x.toLowerCase().includes(q.toLowerCase()));
@@ -319,16 +320,27 @@ function EscolherExercicio({ onPick, onClose }: { onPick: (ex: string) => void; 
     <Sheet open onClose={onClose} title="Exercício">
       <input autoFocus placeholder="Buscar ou escrever um novo" value={q} onChange={(e) => setQ(e.target.value)} className="mb-3" />
       {q.trim() && !meus.concat(outros).some((x) => x.toLowerCase() === q.trim().toLowerCase()) && (
-        <Button tone="primary" className="w-full mb-3" onClick={() => onPick(q.trim())}>Criar “{q.trim()}”</Button>
+        <div className="card p-3 mb-3">
+          <div className="text-[13px] text-ink3 mb-1">Grupo muscular de “{q.trim()}”</div>
+          <select value={gNovo || grupoDe(d, q.trim())} onChange={(e) => setGNovo(e.target.value)} className="mb-2">
+            {GRUPOS.map((g) => <option key={g}>{g}</option>)}
+          </select>
+          <Button tone="primary" className="w-full" onClick={() => { const x = q.trim(), g = gNovo || grupoDe(d, x); update((dd) => setExGroup(dd, x, g)); onPick(x); }}>Criar e usar</Button>
+        </div>
       )}
-      {filtra(meus).length > 0 && <div className="text-[13px] text-ink3 px-1 mb-1">Os seus</div>}
-      <div className="card px-4 mb-3">
-        {filtra(meus).map((x, i) => <button key={x} onClick={() => onPick(x)} className={`w-full text-left py-3 ${i ? "border-t border-line" : ""}`}>{x}</button>)}
-      </div>
-      <div className="text-[13px] text-ink3 px-1 mb-1">Sugestões</div>
-      <div className="card px-4">
-        {filtra(outros).map((x, i) => <button key={x} onClick={() => onPick(x)} className={`w-full text-left py-3 ${i ? "border-t border-line" : ""}`}>{x}</button>)}
-      </div>
+      {[["Os seus", filtra(meus)], ["Sugestões", filtra(outros)]].map(([titulo, lista]) => (lista as string[]).length > 0 && (
+        <div key={titulo as string} className="mb-3">
+          <div className="text-[13px] font-semibold text-ink2 px-1 mb-1">{titulo as string}</div>
+          {agrupar(lista as string[], (x) => grupoDe(d, x)).map((g) => (
+            <div key={g.grupo} className="mb-2">
+              <div className="text-[12px] text-ink3 px-1 mb-0.5">{g.grupo}</div>
+              <div className="card px-4">
+                {g.itens.map((x, i) => <button key={x} onClick={() => onPick(x)} className={`w-full text-left py-3 ${i ? "border-t border-line" : ""}`}>{x}</button>)}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
     </Sheet>
   );
 }
@@ -395,7 +407,9 @@ function Progresso() {
       ) : (
         <>
           <select value={atual} onChange={(e) => setEx(e.target.value)} className="mb-3">
-            {comHist.map((e) => <option key={e} value={e}>{e}</option>)}
+            {agrupar(comHist, (e) => grupoDe(d, e)).map((g) => (
+              <optgroup key={g.grupo} label={g.grupo}>{g.itens.map((e) => <option key={e} value={e}>{e}</option>)}</optgroup>
+            ))}
           </select>
           <Card>
             {h.length >= 2 && (
@@ -530,14 +544,19 @@ function Plano() {
 
       <Section>Rotinas</Section>
       <div className="card px-4">
-        {f.routines.map((r, i) => (
-          <button key={r.id} onClick={() => setRot({ r })} className={`w-full flex items-center gap-3 py-3 text-left ${i ? "border-t border-line" : ""}`}>
-            <span className="flex-1 min-w-0">
-              <span className="block">{r.name}</span>
-              <span className="block text-[12px] text-ink3 truncate">{r.exercises.join(", ") || "sem exercícios"}</span>
-            </span>
-            <span className="text-ink3 text-xl" aria-hidden>›</span>
-          </button>
+        {agrupar(f.routines, (r) => grupoDaRotina(d, r)).map((g) => (
+          <div key={g.grupo}>
+            <div className="text-[12px] font-semibold text-ink3 uppercase tracking-wide pt-3">{g.grupo}</div>
+            {g.itens.map((r) => (
+              <button key={r.id} onClick={() => setRot({ r })} className="w-full flex items-center gap-3 py-3 text-left border-t border-line first:border-t-0">
+                <span className="flex-1 min-w-0">
+                  <span className="block">{r.name}</span>
+                  <span className="block text-[12px] text-ink3 truncate">{r.exercises.join(", ") || "sem exercícios"}</span>
+                </span>
+                <span className="text-ink3 text-xl" aria-hidden>›</span>
+              </button>
+            ))}
+          </div>
         ))}
         <button className={`w-full text-left py-3 text-link font-semibold ${f.routines.length ? "border-t border-line" : ""}`} onClick={() => setRot({ r: null })}>+ Nova rotina</button>
         <button className="w-full text-left py-3 text-link font-semibold border-t border-line" onClick={() => setModelos(true)}>+ Começar de um modelo</button>
@@ -666,10 +685,15 @@ function RotinaForm({ r, paraDia, onClose }: { r: Routine | null; paraDia?: numb
   const [cMin, setCMin] = useState(r?.cardio ? String(r.cardio.min) : "");
   const [exs, setExs] = useState<string[]>(r?.exercises ?? []);
   const [add, setAdd] = useState(false);
+  const dd0 = useData();
+  const [grupo, setGrupo] = useState(r?.group ?? "");
+  const grupoAuto = grupoDaRotina(dd0, { id: "", name: nome, exercises: exs });
   return (
     <Sheet open onClose={onClose} title={r?.id ? "Editar rotina" : "Nova rotina"}>
       <label className="block mb-3"><span className="block text-[13px] text-ink3 px-1 mb-1">Nome</span>
         <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Peito, tríceps e ombro" /></label>
+      <label className="block mb-3"><span className="block text-[13px] text-ink3 px-1 mb-1">Grupo muscular</span>
+        <select value={grupo || grupoAuto} onChange={(e) => setGrupo(e.target.value)}>{GRUPOS.map((g) => <option key={g}>{g}</option>)}</select></label>
       <div className="grid grid-cols-2 gap-2 mb-3">
         <label className="block min-w-0"><span className="block text-[13px] text-ink3 px-1 mb-1">Ênfase</span>
           <input value={foco} onChange={(e) => setFoco(e.target.value)} placeholder="Ex.: ombro" /></label>
@@ -700,7 +724,7 @@ function RotinaForm({ r, paraDia, onClose }: { r: Routine | null; paraDia?: numb
           const cm = Math.round(parse(cMin)), tm = Math.round(parse(min));
           act("Rotina salva", (dd) => {
             let out = saveRoutine(dd, {
-              id: r?.id ?? "", name: nome.trim(), exercises: exs, focus: foco.trim() || undefined,
+              id: r?.id ?? "", name: nome.trim(), exercises: exs, focus: foco.trim() || undefined, group: grupo || undefined,
               minutes: Number.isFinite(tm) && tm > 0 ? tm : undefined, cardio: Number.isFinite(cm) && cm > 0 ? { tipo: cTipo.trim() || "Cardio", min: cm } : undefined,
             });
             // rotina nova criada a partir de um dia da semana: já fica nesse dia

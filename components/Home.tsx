@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { catIcon, catName } from "@/lib/categories";
 import { brl, brl0, daysInMonth, monthName, shiftMonth } from "@/lib/format";
 import { computeScenarios } from "@/lib/projections";
-import { byCategory, cumulative, envelopes, ofMonth, variableSpend } from "@/lib/stats";
+import { typeOf } from "@/lib/categories";
+import { byCategory, cumulative, envelopes, isMyVariableSpend, ofMonth, variableSpend } from "@/lib/stats";
 import { billPaid, categoryTable, priceChanges, recurringSuggestions, safeToSpend } from "@/lib/insights";
 import { saveBackup } from "@/lib/backup";
 import { billActive, cdbNet, changesSinceBackup, fatherPending, moneyParts, cdbPerDay, dismissRecurring, fatherBalance, monthKey, myMoney, parcela, projectionInput, toggleBillPaid, update, useData } from "@/lib/store";
@@ -25,6 +26,8 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
   const [open, setOpen] = useState<Tx | null>(null);
   const [todas, setTodas] = useState(false);
   const [revisar, setRevisar] = useState(false);
+  const [explDist, setExplDist] = useState(false);
+  const [explMeta, setExplMeta] = useState(false);
 
   const pai = fatherBalance(d);
   const account = d.config.accountBalance;
@@ -242,14 +245,14 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
           </Card>
 
           <div className="grid grid-cols-2 gap-3 mt-3">
-            <Card>
-              <div className="text-[15px] font-semibold mb-1">Distribuição</div>
-              <CategoryDonut data={cats} onSelect={abrirCat} />
+            <Card onClick={() => setExplDist(true)}>
+              <div className="text-[15px] font-semibold mb-1 flex justify-between">Distribuição <span className="text-ink3" aria-hidden>›</span></div>
+              <CategoryDonut data={cats} onSelect={() => setExplDist(true)} />
             </Card>
-            <Card>
-              <div className="text-[15px] font-semibold mb-3">Metas</div>
+            <Card onClick={() => setExplMeta(true)}>
+              <div className="text-[15px] font-semibold mb-3 flex justify-between">Metas <span className="text-ink3" aria-hidden>›</span></div>
               <Goal label="Meta de dezembro" pct={goalPct} color="var(--meta)" />
-              <Goal label="Teto do mês" pct={teto ? Math.min(100, Math.round((spent / teto) * 100)) : 0} color="var(--meu)" over={spent > teto} />
+              <Goal label="Teto do mês" pct={teto ? Math.min(100, Math.round((spent / teto) * 100)) : spent > 0 ? 100 : 0} color="var(--meu)" over={spent > teto} />
               <div className="text-[13px] text-ink3 mt-3">
                 Faltam <Money v={Math.max(0, d.config.goalAmount - meu)} /> para a meta.
               </div>
@@ -296,6 +299,14 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
           <CatRows rows={tabela} customs={customs} hidden={hidden} onOpen={(k) => { setTodas(false); setCat(k); }} />
         </div>
         <p className="text-[13px] text-ink3 mt-2 px-1">Toque numa categoria para ver o que tem nela e reclassificar.</p>
+      </Sheet>
+      <Sheet open={explDist} onClose={() => setExplDist(false)} title={`Para onde foi · ${monthName(month)}`}>
+        <ExplicaGastos d={d} month={month} cats={tabela} spent={spent} prevSpent={prevSpent} hidden={hidden}
+          onCat={(k) => { setExplDist(false); setCat(k); }} />
+      </Sheet>
+      <Sheet open={explMeta} onClose={() => setExplMeta(false)} title="Suas metas">
+        <ExplicaMetas meu={meu} alvo={d.config.goalAmount} teto={teto} spent={spent} isNow={isNow} daysLeft={daysLeft}
+          onVer={() => { setExplMeta(false); goMeta(); }} />
       </Sheet>
       <TxSheet tx={open} onClose={() => setOpen(null)} />
       {revisar && <Revisar onClose={() => setRevisar(false)} />}
@@ -428,5 +439,91 @@ function FixedBills({ d, month }: { d: Data; month: string }) {
       </div>
       <p className="text-[13px] text-ink3 px-1 mt-1.5">Toque para marcar ou desmarcar como paga.</p>
     </>
+  );
+}
+
+/** Janela da Distribuição: tudo o que saiu no mês, separado pelo que conta no teto e o que não conta. */
+function ExplicaGastos({ d, month, cats, spent, prevSpent, hidden, onCat }: {
+  d: Data; month: string; cats: { key: string; value: number; prev: number }[]; spent: number; prevSpent: number; hidden: boolean; onCat: (k: string) => void;
+}) {
+  const customs = d.config.customCats;
+  const saidas = ofMonth(d.txs, month).filter((t) => t.amount < 0);
+  const soma = (f: (t: Tx) => boolean) => saidas.filter(f).reduce((s, t) => s - t.amount, 0);
+  const fixas = soma((t) => typeOf(t.category) === "fixed");
+  const pai = soma((t) => typeOf(t.category) === "fathers");
+  const outros = soma((t) => ["savings", "receivable"].includes(typeOf(t.category)));
+  const total = spent + fixas + pai + outros;
+  const partes = [
+    { nome: "Gastos do dia a dia", v: spent, cor: "var(--meu)", nota: "Conta no teto do mês" },
+    { nome: "Contas fixas", v: fixas, cor: "var(--meta)", nota: "Aluguel, parcelas e afins. Já descontadas no teto" },
+    { nome: "Pelo seu pai", v: pai, cor: "var(--alert)", nota: "Dinheiro dele, fora do seu gasto" },
+    { nome: "Guardado ou emprestado", v: outros, cor: "var(--ink3)", nota: "Saiu da conta mas não é gasto" },
+  ].filter((p) => p.v > 0);
+  const top = saidas.filter(isMyVariableSpend).sort((a, b) => a.amount - b.amount).slice(0, 5);
+  const diff = prevSpent ? Math.round(((spent - prevSpent) / prevSpent) * 100) : null;
+  return (
+    <div>
+      <div className="card p-4 mb-3">
+        <div className="text-ink2 text-[14px]">Saiu da conta em {monthName(month)}</div>
+        <Money v={total} className="text-[28px] font-bold" />
+        <div className="flex h-3 rounded-full overflow-hidden bg-fill mt-3" aria-hidden>
+          {partes.map((p) => <span key={p.nome} style={{ width: `${(p.v / (total || 1)) * 100}%`, background: p.cor }} />)}
+        </div>
+        {partes.map((p) => (
+          <div key={p.nome} className="flex items-start gap-2 mt-3">
+            <span className="w-3 h-3 rounded-full mt-1.5 shrink-0" style={{ background: p.cor }} aria-hidden />
+            <span className="flex-1 min-w-0">
+              <span className="block">{p.nome}</span>
+              <span className="block text-[12px] text-ink3">{p.nota}</span>
+            </span>
+            <Money v={p.v} className="font-semibold" />
+          </div>
+        ))}
+      </div>
+
+      <div className="text-[13px] text-ink3 px-1 mb-1">Do dia a dia, por categoria{diff !== null && !hidden ? ` · ${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)}% vs mês passado` : ""}</div>
+      <div className="card px-4 mb-3">
+        {cats.length ? <CatRows rows={cats} customs={customs} hidden={hidden} onOpen={onCat} /> : <div className="py-3 text-ink2">Nada gasto neste mês.</div>}
+      </div>
+
+      {top.length > 0 && (
+        <>
+          <div className="text-[13px] text-ink3 px-1 mb-1">Maiores gastos</div>
+          <div className="card px-4">
+            {top.map((t) => <TxRow key={t.id} t={t} onOpen={() => onCat(t.category)} />)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Janela das Metas: duas barras e de onde vem cada número. */
+function ExplicaMetas({ meu, alvo, teto, spent, isNow, daysLeft, onVer }: {
+  meu: number; alvo: number; teto: number; spent: number; isNow: boolean; daysLeft: number; onVer: () => void;
+}) {
+  const pctMeta = alvo ? Math.min(100, Math.round((meu / alvo) * 100)) : 0;
+  const pctTeto = teto ? Math.round((spent / teto) * 100) : spent > 0 ? 100 : 0;
+  const sobra = teto - spent;
+  return (
+    <div>
+      <div className="card p-4 mb-3">
+        <div className="font-semibold">Meta de dezembro</div>
+        <div className="text-[13px] text-ink3 mb-2">Seu dinheiro total hoje contra o que você quer ter</div>
+        <Progress value={pctMeta} max={100} color="var(--meta)" />
+        <div className="flex justify-between mt-2 text-[15px]"><span>Tem <Money v={meu} /></span><span className="text-ink2">{pctMeta}% de <Money v={alvo} /></span></div>
+        <div className="text-ink2 text-[14px] mt-1">Faltam <Money v={Math.max(0, alvo - meu)} />.</div>
+      </div>
+      <div className="card p-4 mb-3">
+        <div className="font-semibold">Teto do mês</div>
+        <div className="text-[13px] text-ink3 mb-2">O quanto pode gastar no dia a dia para ainda chegar na meta</div>
+        <Progress value={Math.min(100, pctTeto)} max={100} color={spent > teto ? "var(--alert)" : "var(--meu)"} />
+        <div className="flex justify-between mt-2 text-[15px]"><span>Gastou <Money v={spent} /></span><span className={spent > teto ? "text-alert font-semibold" : "text-ink2"}>{pctTeto}% de <Money v={teto} /></span></div>
+        <div className={`text-[14px] mt-1 ${sobra < 0 ? "text-alert" : "text-ink2"}`}>
+          {sobra >= 0 ? <>Ainda pode gastar <Money v={sobra} />{isNow && daysLeft > 0 ? <> (<Money v={sobra / daysLeft} /> por dia)</> : null}.</> : <>Passou do teto em <Money v={-sobra} />.</>}
+        </div>
+      </div>
+      <Button className="w-full" onClick={onVer}>Ver contas e cenários</Button>
+    </div>
   );
 }

@@ -753,3 +753,34 @@ console.log("cdb por aplicação ok");
   assert.equal(S.fatherPending(aj).length, 0, "ajuste dado depois dos lançamentos já os cobre");
 }
 console.log("pai pendente ok");
+
+{
+  // o rendimento do CDB entra na projeção: o teto sobe e a meta chega antes
+  const P = require("../lib/projections") as typeof import("../lib/projections");
+  const base = { effectiveBalance: 10000, salary: 3000, fixedCosts: 1000, remainingMonths: 4, specialExpenses: [], goalAmount: 12000, startYear: 2026, startMonth: 9, skipFirstMonthSalary: false };
+  const sem = P.calculateCeilingVariable(base);
+  const com = P.calculateCeilingVariable({ ...base, cdbMonthly: 120 });
+  assert.equal(com - sem, Math.floor((3 * 120) / 4 + (sem % 1)) , "3 meses de rendimento (o 1º não conta) divididos em 4 meses");
+  const fim = (i: typeof base & { cdbMonthly?: number }) => P.buildMonthlyProjection(i, 500).at(-1)!.projectedBalance;
+  assert.equal(fim({ ...base, cdbMonthly: 100 }) - fim(base), 300, "o rendimento soma 3 vezes (não no mês atual)");
+}
+console.log("cdb na projeção ok");
+
+{
+  const L = require("../lib/life") as typeof import("../lib/life");
+  const d0 = { txs: [], goals: [], config: DEFAULT_CONFIG, fit: undefined } as unknown as Data;
+  assert.equal(L.grupoDe(d0, "Supino reto"), "Peito");
+  assert.equal(L.grupoDe(d0, "Crucifixo inverso"), "Ombro", "inverso é ombro, não peito");
+  assert.equal(L.grupoDe(d0, "Tríceps corda"), "Tríceps");
+  assert.equal(L.grupoDe(d0, "Rosca martelo"), "Bíceps");
+  assert.equal(L.grupoDe(d0, "Remada baixa"), "Costas");
+  assert.equal(L.grupoDe(d0, "Leg press"), "Perna");
+  assert.equal(L.grupoDe(d0, "Coisa nova"), "Outros");
+  const d1 = L.setExGroup(d0, "Coisa nova", "Perna");
+  assert.equal(L.grupoDe(d1, "Coisa nova"), "Perna", "o grupo escolhido vale mais que o nome");
+  const rot = { id: "r", name: "x", exercises: ["Supino reto", "Supino inclinado", "Tríceps corda"] };
+  assert.equal(L.grupoDaRotina(d0, rot), "Peito");
+  assert.equal(L.grupoDaRotina(d0, { ...rot, group: "Costas" }), "Costas");
+  assert.deepEqual(L.agrupar(["Leg press", "Supino reto"], (x) => L.grupoDe(d0, x)).map((g) => g.grupo), ["Peito", "Perna"]);
+}
+console.log("grupos musculares ok");

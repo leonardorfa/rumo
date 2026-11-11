@@ -130,6 +130,7 @@ export interface Routine {
   focus?: string; // ênfase do dia (ex.: peito)
   minutes?: number; // tempo que você tem para treinar
   cardio?: Cardio; // cardio previsto (ex.: bike 20 min)
+  group?: string; // grupo muscular (senão sai do que a rotina treina)
 }
 export interface Workout {
   id: string;
@@ -147,6 +148,7 @@ export interface Fit {
   weights: { date: string; kg: number }[];
   days: Record<string, string>; // "0" domingo … "6" sábado → id da rotina ("" = treino sem rotina); ausente = descanso
   dayExtra?: Record<string, DayExtra>; // ajustes de cada dia (ênfase, tempo, cardio, exercícios a mais)
+  exGroups?: Record<string, string>; // grupo muscular dos exercícios que você criou
   time: string; // "18:00", só para a agenda
   routines: Routine[];
   workouts: Workout[];

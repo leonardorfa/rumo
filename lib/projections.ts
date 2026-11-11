@@ -21,6 +21,7 @@ export interface ProjectionInput {
   paidFixedThisMonth?: number; // contas fixas do mês atual já pagas
   recentAvg?: number; // seu gasto variável médio dos últimos meses
   economyPct?: number; // cenário Econômico: % abaixo do teto
+  cdbMonthly?: number; // rendimento líquido do CDB por mês (entra a partir do mês que vem)
 }
 
 export interface MonthProjection {
@@ -65,9 +66,10 @@ export function calculateCeilingVariable(input: ProjectionInput): number {
     input.effectiveBalance + salaryMonths(input) * input.salary;
   const totalFixed = input.remainingMonths * input.fixedCosts - (input.paidFixedThisMonth ?? 0);
   const totalSpecial = input.specialExpenses.reduce((s, e) => s + e.amount, 0);
+  const totalCdb = Math.max(0, input.remainingMonths - 1) * (input.cdbMonthly ?? 0);
   // o gasto deste mês já saiu do saldo: volta para a conta para o teto do mês ser o mês inteiro
   const maxVariable =
-    (totalAvailable - totalFixed - totalSpecial - input.goalAmount + (input.spentThisMonth ?? 0)) /
+    (totalAvailable + totalCdb - totalFixed - totalSpecial - input.goalAmount + (input.spentThisMonth ?? 0)) /
     input.remainingMonths;
   return Math.floor(maxVariable);
 }
@@ -104,7 +106,7 @@ export function buildMonthlyProjection(
     // no mês atual só sai o que falta: o já gasto e as contas já pagas estão no saldo
     const variable = i === 0 ? Math.max(0, plano - (input.spentThisMonth ?? 0)) : plano;
     const fixed = i === 0 ? input.fixedCosts - (input.paidFixedThisMonth ?? 0) : input.fixedCosts;
-    balance = balance + salaryThisMonth - fixed - special - variable;
+    balance = balance + salaryThisMonth + (i > 0 ? input.cdbMonthly ?? 0 : 0) - fixed - special - variable;
     return {
       year,
       month,
@@ -162,7 +164,7 @@ export function monthsToGoal(input: ProjectionInput, monthly: number, max = 120)
     const special = i < input.remainingMonths
       ? input.specialExpenses.filter((e) => e.month === ((input.startMonth - 1 + i) % 12) + 1).reduce((s, e) => s + e.amount, 0)
       : 0;
-    balance += salary - (i === 0 ? fixedNow : input.fixedCosts) - special - variable;
+    balance += salary + (i > 0 ? input.cdbMonthly ?? 0 : 0) - (i === 0 ? fixedNow : input.fixedCosts) - special - variable;
     if (balance >= input.goalAmount) return i + 1;
   }
   return null;
