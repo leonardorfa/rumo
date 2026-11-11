@@ -9,7 +9,7 @@ import {
 } from "@/lib/life";
 import { update, useData } from "@/lib/store";
 import type { Cardio, Routine, Workout } from "@/lib/types";
-import { BarsChart, MiniTrend, TrendChart } from "./charts";
+import { Bars3D, BarsChart, MiniTrend, TrendChart } from "./charts";
 import { act, Button, Card, Progress, Section, Segmented, Sheet, Title, toast } from "./ui";
 
 type Aba = "hoje" | "progresso" | "plano";
@@ -430,7 +430,7 @@ function Progresso() {
         <div className="text-[13px] text-ink2 mb-1">Treinos por semana (últimas 8)</div>
         <BarsChart name="Treinos" data={vol.map((v) => ({ label: v.label, value: v.treinos }))} color="var(--s3)" />
         <div className="text-[13px] text-ink2 mt-3 mb-1">Volume total por semana (kg)</div>
-        <BarsChart name="Volume (kg)" data={vol.map((v) => ({ label: v.label, value: v.volume }))} />
+        <Bars3D name="Volume (kg)" fmt={(v) => v.toLocaleString("pt-BR")} data={vol.map((v) => ({ label: v.label, value: v.volume }))} />
       </Card>
     </>
   );

@@ -133,7 +133,7 @@ export default function Mais({ goReview, goCdb }: { goReview: () => void; goCdb:
           try {
             const r = importSetup(getData(), JSON.parse(await f.text()));
             setData(r.data);
-            toast(`Importado: ${r.metas} meta${r.metas === 1 ? "" : "s"}, ${r.pesos} peso${r.pesos === 1 ? "" : "s"}`);
+            toast(`Importado: ${r.metas} meta${r.metas === 1 ? "" : "s"}, ${r.pesos} peso${r.pesos === 1 ? "" : "s"}${r.aplicacoes ? `, ${r.aplicacoes} aplicações do CDB` : ""}`);
           } catch (e) {
             alert((e as Error).message || "Arquivo inválido.");
           }
@@ -357,6 +357,8 @@ function Settings({ cfg, goCdb }: { cfg: Config; goCdb: () => void }) {
         })} />
         <Row label="Abrir com valores escondidos" value={p.hideOnStart ? "sim" : "não"} onClick={() => setP({ hideOnStart: !p.hideOnStart })} />
         <Row label="O que te devem conta no meu dinheiro" value={p.countReceivables ? "sim" : "não"} onClick={() => setP({ countReceivables: !p.countReceivables })} />
+        <Row label="Fatura do cartão em aberto desconta do meu dinheiro" sub={p.countInvoices ? "ligado: a fatura importada e não paga sai do disponível" : "desligado: a fatura não mexe em nada (o pagamento aparece no extrato)"} value={p.countInvoices ? "sim" : "não"} onClick={() => setP({ countInvoices: !p.countInvoices })} />
+        <Row label="Animações e gráficos 3D" value={p.anim ? "sim" : "não"} onClick={() => setP({ anim: !p.anim })} />
         <Row label="Data de nascimento" value={p.birth ? new Date(p.birth + "T12:00:00").toLocaleDateString("pt-BR") : "informar"} onClick={() => setForm({
           title: "Data de nascimento", fields: [{ key: "v", label: "Para as metas “até os X anos”", kind: "date", value: p.birth }],
           onSave: (v) => v.v && setP({ birth: String(v.v) }),
@@ -566,8 +568,9 @@ function InvoiceImport({ goReview }: { goReview: () => void }) {
     <>
       <Card>
         <p className="text-ink2 mb-3">
-          A fatura sai do seu dinheiro na hora, como dívida do cartão. Quando o pagamento aparecer no extrato, ela fica paga sozinha
-          (sem descontar duas vezes).
+          Importe a fatura só para classificar as compras. {d.config.prefs.countInvoices
+            ? "Ela desconta do seu dinheiro até o pagamento aparecer no extrato (opção ligada em Ajustes)."
+            : "Ela não desconta do seu dinheiro: o que sai da conta é o pagamento da fatura, que vem no extrato. Se quiser descontar a fatura em aberto, ligue em Ajustes, Personalizar."}
         </p>
         {d.config.invoices.length > 0 && (
           <div className="divide-y divide-line mb-3">

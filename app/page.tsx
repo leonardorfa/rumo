@@ -13,6 +13,7 @@ import Cdb from "@/components/Cdb";
 import { AcoesFab } from "@/components/Voz";
 import { Card, FilePick, HideCtx, Icons, Toaster, toast } from "@/components/ui";
 import { restoreFile } from "@/lib/backup";
+import { setAnimOn } from "@/lib/anim";
 import { refreshCdi } from "@/lib/cdi";
 import { latestMonth } from "@/lib/stats";
 import { getData, useData } from "@/lib/store";
@@ -37,6 +38,15 @@ export default function App() {
   const [hidden, setHidden] = useState(true); // sempre abre com os valores escondidos
   const [novo, setNovo] = useState(false);
   const [aberto, setAberto] = useState(false); // passou pela trava
+
+  // animações: sua preferência e o "reduzir movimento" do iPhone
+  const animPref = d.config.prefs.anim;
+  useEffect(() => {
+    const reduz = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const on = animPref && !reduz;
+    setAnimOn(on);
+    document.documentElement.classList.toggle("anim", on);
+  }, [animPref]);
 
   useEffect(() => {
     setHidden(getData().config.prefs.hideOnStart);
@@ -85,7 +95,7 @@ export default function App() {
           <>
             {tab === "home" && (
               <Home month={month} setMonth={setMonth} hidden={hidden} setHidden={toggleHide}
-                goMeta={() => go("meta")} goCdb={() => go("cdb")} goExtrato={() => { setFilter("all"); go("extrato"); }} />
+                goMeta={() => go("meta")} goCdb={() => go("cdb")} goPai={() => go("pai")} goExtrato={() => { setFilter("all"); go("extrato"); }} />
             )}
             {tab === "extrato" && <Extrato month={month} setMonth={setMonth} filter={filter} setFilter={setFilter} />}
             {tab === "pai" && <Pai month={month} setMonth={setMonth} />}
@@ -124,7 +134,7 @@ function Welcome({ onStart }: { onStart: () => void }) {
   return (
     <div className="pt-14">
       <div className="hero card p-6">
-        <h1 className="text-[30px] font-extrabold leading-tight">Rumo.<br />Dinheiro, metas e treino.</h1>
+        <h1 className="text-[30px] font-extrabold leading-tight">Órbita.<br />Dinheiro, metas e treino.</h1>
         <p className="text-white/75 mt-3 text-[16px]">Seus dados ficam só neste iPhone. Sem conta, sem IA.</p>
       </div>
       <Card className="mt-4">

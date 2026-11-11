@@ -2,7 +2,7 @@
 import { localDay } from "./format";
 import { netWorthHistory } from "./insights";
 import { myMoney } from "./store";
-import type { Cardio, Data, DayExtra, Fit, Goal, Routine, Workout } from "./types";
+import type { Cardio, CdbTranche, Data, DayExtra, Fit, Goal, Routine, Workout } from "./types";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const uid = () => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
@@ -328,7 +328,7 @@ export function buildIcs(d: Data, now = new Date()): string {
     const desc = linhas.map((l) => l.replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;")).join("\\n");
     return [
       "BEGIN:VEVENT",
-      `UID:treino-${w}@rumo.app`,
+      `UID:treino-${w}@orbita.app`,
       `DTSTAMP:${fmt(hoje, 0, 0)}Z`,
       `DTSTART:${fmt(primeiro, hh, mm)}`,
       `DTEND:${fmt(primeiro, Math.floor(fim / 60), fim % 60)}`,
@@ -339,7 +339,7 @@ export function buildIcs(d: Data, now = new Date()): string {
       "END:VEVENT",
     ].join("\r\n");
   });
-  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Rumo//Treino//PT", "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR"].join("\r\n");
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Orbita//Treino//PT", "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR"].join("\r\n");
 }
 
 // ---------- configuração inicial por arquivo ----------
@@ -348,8 +348,8 @@ export function buildIcs(d: Data, now = new Date()): string {
  * Junta num backup existente: data de nascimento e ajustes, metas, peso e agenda
  * de treino de um arquivo .json. Não mexe em transações nem em saldos.
  */
-export function importSetup(d: Data, json: unknown): { data: Data; metas: number; pesos: number } {
-  const j = json as { prefs?: Partial<Data["config"]["prefs"]>; goals?: Goal[]; fit?: Partial<Fit> } | null;
+export function importSetup(d: Data, json: unknown): { data: Data; metas: number; pesos: number; aplicacoes: number } {
+  const j = json as { prefs?: Partial<Data["config"]["prefs"]>; goals?: Goal[]; fit?: Partial<Fit>; clearInvoices?: boolean; cdb?: { replace?: boolean; tranches?: CdbTranche[]; pctCdi?: number } } | null;
   if (!j || typeof j !== "object") throw new Error("Arquivo inválido.");
   let out: Data = { ...d, config: { ...d.config, prefs: { ...d.config.prefs, ...(j.prefs ?? {}) } } };
   const ids = new Set((out.goals ?? []).map((g) => g.id));
@@ -380,5 +380,21 @@ export function importSetup(d: Data, json: unknown): { data: Data; metas: number
       time: j.fit?.time && f.time === "18:00" ? j.fit.time : f.time,
     });
   }
-  return { data: out, metas: novas.length, pesos: pesos.length };
+  // fatura do cartão que já foi paga: tira a dívida de uma vez
+  if (j.clearInvoices) out = { ...out, config: { ...out.config, invoices: [] } };
+  // aplicações de renda fixa (como no C6): troca todas ou soma por id, sem perder uma conferência mais nova
+  let aplicacoes = 0;
+  const novasAp = (j.cdb?.tranches ?? []).filter((t) => t?.id && t.name && t.date && t.principal > 0 && t.pct > 0);
+  if (novasAp.length) {
+    const atuais = out.config.cdb.tranches ?? [];
+    const merged = j.cdb?.replace
+      ? novasAp.map((n) => {
+          const velho = atuais.find((a) => a.id === n.id);
+          return velho?.checkDate && (!n.checkDate || velho.checkDate > n.checkDate) ? { ...n, checkDate: velho.checkDate, checkValue: velho.checkValue } : n;
+        })
+      : [...atuais, ...novasAp.filter((n) => !atuais.some((a) => a.id === n.id))];
+    aplicacoes = merged.length;
+    out = { ...out, config: { ...out.config, cdb: { ...out.config.cdb, ...(j.cdb?.pctCdi ? { pctCdi: j.cdb.pctCdi } : {}), tranches: merged, moves: [] } } };
+  }
+  return { data: out, metas: novas.length, pesos: pesos.length, aplicacoes };
 }

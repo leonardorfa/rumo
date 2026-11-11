@@ -22,7 +22,7 @@ export const apagarChave = () => put(K.key, null);
 export const chaveMascarada = (k: string) => (k.length > 8 ? `••••${k.slice(-4)}` : k ? "••••" : "");
 
 const SISTEMA = [
-  "Você é o assistente do app Rumo, que junta dinheiro, metas e treino de um jovem brasileiro.",
+  "Você é o assistente do app Órbita, que junta dinheiro, metas e treino de um jovem brasileiro.",
   "Responda em português do Brasil, direto, sem introdução e sem repetir a pergunta.",
   "Comece toda frase com letra maiúscula. Não use travessão como pausa.",
   "Use somente os dados do bloco DADOS quando houver; se faltar um dado, diga qual falta em vez de inventar.",

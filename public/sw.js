@@ -1,6 +1,6 @@
 // Rede primeiro, cópia local se estiver sem internet. Os dados não passam
 // por aqui: moram no armazenamento do app, não no cache.
-const CACHE = "rumo-v1";
+const CACHE = "orbita-v1";
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) =>
   e.waitUntil(

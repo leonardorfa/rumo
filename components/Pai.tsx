@@ -4,11 +4,11 @@ import { useState } from "react";
 import { isFathers } from "@/lib/categories";
 import { monthName } from "@/lib/format";
 import { fatherFlow, ofMonth } from "@/lib/stats";
-import { fatherBalance, fatherDelete, fatherMove, fatherSet, monthKey, syncFather, update, useData } from "@/lib/store";
+import { fatherBalance, fatherDelete, fatherPending, fatherMove, fatherSet, monthKey, syncFather, update, useData } from "@/lib/store";
 import type { Tx } from "@/lib/types";
 import { FatherChart } from "./charts";
 import { TxList, TxSheet } from "./Tx";
-import { Button, Card, Money, MonthSwitcher, Section, Sheet, Title, toast } from "./ui";
+import { Button, Card, Money, MonthSwitcher, Section, Segmented, Sheet, Title, toast } from "./ui";
 
 type Mode = "in" | "out" | "set" | null;
 const MODE_TEXT = {
@@ -20,6 +20,7 @@ const MODE_TEXT = {
 export default function Pai({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
   const d = useData();
   const bal = fatherBalance(d);
+  const pend = fatherPending(d);
   const [mode, setMode] = useState<Mode>(null);
   const [open, setOpen] = useState<Tx | null>(null);
   const monthTxs = ofMonth(d.txs, month);
@@ -35,6 +36,15 @@ export default function Pai({ month, setMonth }: { month: string; setMonth: (m: 
     <div>
       <Title>Pai</Title>
 
+      {pend.length > 0 && (
+        <Card className="mb-3">
+          <div className="font-semibold">Falta acertar com o crédito dele</div>
+          <div className="text-[13px] text-ink2 mb-2">
+            {pend.length} lançamento{pend.length === 1 ? "" : "s"} do pai ainda fora do crédito (<Money v={pend.reduce((s, t) => s + t.amount, 0)} signed />). Enquanto isso o “meu dinheiro” não reflete o que ele te deve.
+          </div>
+          <Button tone="primary" className="w-full" onClick={() => { update((dd) => syncFather(dd, pend)); toast("Lançado no crédito do pai"); }}>Lançar no crédito do pai</Button>
+        </Card>
+      )}
       <Card>
         <div className="text-ink2 text-[15px]">
           {bal > 0 ? "Você está com dinheiro do pai" : bal < 0 ? "Seu pai te deve" : "Vocês estão quites"}
@@ -116,13 +126,15 @@ function Row({ label, v, className = "", signed }: { label: string; v: number; c
 }
 
 function MoveSheet({ mode, current, onClose }: { mode: Exclude<Mode, null>; current: number; onClose: () => void }) {
-  const [value, setValue] = useState(mode === "set" ? String(current).replace(".", ",") : "");
+  const [value, setValue] = useState(mode === "set" ? String(Math.abs(current)).replace(".", ",") : "");
   const [desc, setDesc] = useState("");
+  // "Definir" sem sinal de menos: você diz quem deve a quem e o valor
+  const [lado, setLado] = useState<"guardo" | "deve">(current < 0 ? "deve" : "guardo");
   const n = parseFloat(value.replace(/\./g, "").replace(",", "."));
 
   function save() {
     if (!Number.isFinite(n)) return;
-    if (mode === "set") update((d) => fatherSet(d, n, desc || "Ajuste de saldo"));
+    if (mode === "set") update((d) => fatherSet(d, lado === "deve" ? -Math.abs(n) : Math.abs(n), desc || "Ajuste de saldo"));
     else update((d) => fatherMove(d, mode === "in" ? Math.abs(n) : -Math.abs(n), desc || MODE_TEXT[mode].title));
     toast("Crédito do pai atualizado");
     onClose();
@@ -130,7 +142,15 @@ function MoveSheet({ mode, current, onClose }: { mode: Exclude<Mode, null>; curr
 
   return (
     <Sheet open onClose={onClose} title={MODE_TEXT[mode].title}>
-      <p className="text-ink2 mb-3">{MODE_TEXT[mode].hint}</p>
+      <p className="text-ink2 mb-3">{mode === "set" ? "Diga como está agora entre você e seu pai." : MODE_TEXT[mode].hint}</p>
+      {mode === "set" && (
+        <>
+          <Segmented value={lado} onChange={setLado} options={[{ value: "guardo", label: "Guardo dinheiro dele" }, { value: "deve", label: "Ele me deve" }]} />
+          <p className="text-[13px] text-ink3 px-1 mt-2 mb-3">
+            {lado === "deve" ? "Esse valor é seu: entra no “meu dinheiro”, em “a receber”." : "Esse valor está na sua conta, mas é dele: não entra no “meu dinheiro”."}
+          </p>
+        </>
+      )}
       <input inputMode="decimal" autoFocus placeholder="Valor em R$" value={value} onChange={(e) => setValue(e.target.value)} className="mb-2 text-[20px]" />
       <input placeholder="Descrição (opcional)" value={desc} onChange={(e) => setDesc(e.target.value)} className="mb-4" />
       <Button tone="primary" className="w-full" disabled={!Number.isFinite(n)} onClick={save}>Salvar</Button>

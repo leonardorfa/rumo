@@ -306,7 +306,7 @@ console.log("cdb sem data ok");
   // ---- fatura do cartão: compra vira dívida na hora, pagamento quita ----
   const S = require("../lib/store") as typeof import("../lib/store");
   let fz: import("../lib/types").Data = { version: 1, txs: [], father: [], rules: [], lastBackup: null,
-    config: { ...S.DEFAULT_CONFIG, accountBalance: 1000, bills: [], fatherCreditStart: 0, rendaFixa: 0 } };
+    config: { ...S.DEFAULT_CONFIG, accountBalance: 1000, bills: [], fatherCreditStart: 0, rendaFixa: 0, prefs: { ...S.DEFAULT_PREFS, countInvoices: true } } };
   const antes = S.myMoney(fz);
   fz = S.importInvoice(fz, [{ date: "2026-09-20", description: "LOJA A", amount: -300 }, { date: "2026-09-22", description: "LOJA B", amount: -100 }],
     { due: "2026-10-10", total: 400 }).data;
@@ -600,11 +600,19 @@ console.log("aba cdb ok");
   assert.equal(m.doPai, 500);
   assert.equal(m.total, 10000 + m.cdb + 500, "o que o pai deve conta no total");
   // pessoas que devem + fatura em aberto
-  const mais = S.importInvoice(S.addReceivable(deve, { person: "Ana", description: "", amount: 200, date: "2026-11-01", saiuDaConta: false }),
+  const comFatura = { ...deve, config: { ...deve.config, prefs: { ...deve.config.prefs, countInvoices: true } } };
+  const mais = S.importInvoice(S.addReceivable(comFatura, { person: "Ana", description: "", amount: 200, date: "2026-11-01", saiuDaConta: false }),
     [{ date: "2026-10-20", description: "LOJA", amount: -300 }], { due: "2026-11-10", total: 300 }).data;
   m = S.moneyParts(mais, new Date(2026, 10, 1, 12));
   assert.deepEqual([m.pessoas, m.aReceber, m.fatura, m.disponivel], [200, 700, 300, 9700], "a receber = pai + pessoas; disponível desconta a fatura");
   assert.equal(m.total, Math.round((m.disponivel + m.cdb + m.aReceber) * 100) / 100);
+  // com a opção desligada (padrão) a fatura não desconta de nada
+  const desl = S.importInvoice(deve, [{ date: "2026-10-20", description: "LOJA", amount: -300 }], { due: "2026-11-10", total: 300 }).data;
+  assert.equal(S.cardDebt(desl), 0, "fatura não desconta por padrão");
+  assert.equal(S.moneyParts(desl, new Date(2026, 10, 1, 12)).disponivel, 10000);
+  assert.equal(S.DEFAULT_PREFS.countInvoices, false);
+  // guardar dinheiro do pai: aparece como "guardado" e não entra no total
+  assert.equal(S.moneyParts(base, new Date(2026, 10, 1, 12)).paiGuardado, 3000);
 }
 console.log("saldo e partes ok");
 {
@@ -655,3 +663,93 @@ console.log("treino em 3 divisões ok");
   assert.ok(/fora do ar/.test(interpretaCdi(500, "").msg));
 }
 console.log("cdi bcb ok");
+{
+  // ---- CDB por aplicação, conferido contra as telas do C6 de 10/11/2026 ----
+  const S = require("../lib/store") as typeof import("../lib/store");
+  const C = require("../lib/cdb") as typeof import("../lib/cdb");
+  const fs = require("fs") as typeof import("fs");
+  const path = require("path") as typeof import("path");
+  const rows: { data: string; valor: string }[] = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../checks/fixtures/cdi-bcb.json"), "utf8"));
+  const cdiDaily = Object.fromEntries(rows.map((r) => [r.data.split("/").reverse().join("-"), parseFloat(r.valor)]));
+  const ap = (name: string, date: string, principal: number, pct: number) => ({ id: name, name, date, principal, pct });
+  const mkc = (tr: import("../lib/types").CdbTranche[]): import("../lib/types").Data => ({ version: 1, txs: [], father: [], rules: [], lastBackup: null,
+    config: { ...S.DEFAULT_CONFIG, accountBalance: 1000, bills: [], fatherCreditStart: 0, cdiDaily, cdb: { pctCdi: 101.5, cdiAnnual: 13.65, principal: 0, tranches: tr } } });
+  const quatro = [ap("A", "2026-05-06", 133, 102), ap("B", "2026-06-09", 2500, 102), ap("C", "2026-08-28", 10000, 101.5), ap("D", "2026-08-31", 4890, 101.5)];
+  const dia10 = new Date(2026, 10, 10, 12);
+  const itens = S.cdbItens(mkc(quatro), dia10);
+  const c6 = { A: [142.5, 1.9], B: [2645.26, 32.68], C: [10256.92, 57.8], D: [5013.0, 27.67] } as Record<string, number[]>;
+  for (const i of itens) {
+    assert.ok(Math.abs(i.value - c6[i.t.id][0]) <= 0.02, `${i.t.id}: app ${i.value} vs C6 ${c6[i.t.id][0]}`);
+    assert.ok(Math.abs(i.ir - c6[i.t.id][1]) <= 0.01, `IR ${i.t.id}: app ${i.ir} vs C6 ${c6[i.t.id][1]}`);
+  }
+  const tot = S.cdbNet(mkc(quatro), dia10);
+  assert.ok(Math.abs(tot.bruto - 18057.68) <= 0.06, `total bruto ${tot.bruto}`);
+  assert.equal(S.cdbPrincipalNow(mkc(quatro), dia10), 17523, "total investido");
+  assert.ok(Math.abs(tot.ir - 120.05) <= 0.03 && Math.abs(tot.liquido - 17937.63) <= 0.08, `IR ${tot.ir}, líquido ${tot.liquido}`);
+  assert.deepEqual(itens.map((i) => i.aliquota), [20, 22.5, 22.5, 22.5], "a de 06/05 já passou de 180 dias: 20%");
+  assert.equal(itens[0].proxima!.nova, 17.5, "a de maio cai para 17,5% aos 361 dias");
+  // conferir no C6 recomeça dali e continua rendendo só em dia útil
+  let c = mkc(quatro);
+  for (const [id, v] of [["A", 142.5], ["B", 2645.26], ["C", 10256.92], ["D", 5013]] as const) c = C.conferirAplicacao(c, id, v, dia10);
+  assert.ok(Math.abs(S.cdbNet(c, dia10).bruto - 18057.68) <= 0.01, "logo depois de conferir, bate exato");
+  assert.equal(c.config.cdb.checks!.length, 4, "cada conferência registra a diferença");
+  const amanha = new Date(2026, 10, 11, 12);
+  assert.ok(S.cdbNet(c, amanha).bruto > S.cdbNet(c, dia10).bruto + 9, "no dia seguinte rende ~R$ 9,5 (CDI de 10/11 entra)");
+  // sábado e domingo não rendem
+  const sab = S.cdbNet(c, new Date(2026, 10, 14, 12)).bruto, dom = S.cdbNet(c, new Date(2026, 10, 15, 12)).bruto, seg = S.cdbNet(c, new Date(2026, 10, 16, 12)).bruto;
+  assert.ok(dom === sab || dom - sab < 0.01, "domingo não rende além de sábado (ontem = sexta/sábado)");
+  assert.ok(seg - dom < 0.01, "segunda ainda mostra até sexta: o CDI de segunda só entra na terça");
+  assert.ok(S.cdbNet(c, new Date(2026, 10, 17, 12)).bruto > seg + 9, "terça já tem o rendimento de segunda");
+  // aplicar: nova aplicação rende a partir do próprio dia e sai da conta
+  const nova = C.aplicarCdb(c, { name: "CDB teste", date: "2026-11-10", valor: 1000, pct: 100, saiuDaConta: true }, dia10);
+  assert.equal(nova.config.accountBalance, 0, "1000 saiu da conta");
+  assert.equal(S.cdbTranches(nova).length, 5);
+  assert.ok(Math.abs(S.cdbPrincipalNow(nova, dia10) - 18523) < 0.01);
+  // resgate parcial: 1.000 brutos da C; líquido 995; o principal cai na proporção
+  const rs = C.resgatarAplicacao(c, "C", { bruto: 1000, liquido: 995, date: "2026-11-10", entrouNaConta: true }, dia10);
+  assert.equal(rs.config.accountBalance, 1000 + 995);
+  const cInfo = S.cdbItens(rs, dia10).find((i) => i.t.id === "C")!;
+  assert.ok(Math.abs(cInfo.value - 9256.92) < 0.02 && Math.abs(cInfo.t.principal - 10000 * (1 - 1000 / 10256.92)) < 0.1, `parcial: ${cInfo.value} / ${cInfo.t.principal}`);
+  const fim = C.resgatarAplicacao(rs, "C", { bruto: 99999, liquido: 9000, date: "2026-11-10", entrouNaConta: false }, dia10);
+  assert.equal(S.cdbTranches(fim).length, 3, "resgate total fecha a aplicação");
+  // extrato: aplicação já conhecida não vira outra; manual substituído passa o vínculo
+  const m = S.addManual(c, { date: "2026-11-10", description: "CDB", amount: -500, category: "savings_cdb" });
+  assert.equal(S.cdbTranches(m).length, 5, "aplicação manual vira uma aplicação");
+  const aposExtrato = S.importParsed(m, [{ date: "2026-11-10", description: "APLICACAO CDB", amount: -500 }, { date: "2026-08-28", description: "APLICACAO CDB", amount: -10000 }], null, "2026-11-10").data;
+  assert.equal(S.cdbTranches(aposExtrato).length, 5, "nem a manual duplica nem a antiga (28/08) vira outra");
+  assert.ok(S.cdbTranches(aposExtrato).filter((t) => t.txId).length >= 2, "as duas ficam ligadas aos lançamentos do extrato");
+  // migração do modelo antigo (valor único) para aplicações
+  const velho: import("../lib/types").Data = { ...mkc([]), config: { ...mkc([]).config, rendaFixa: 17743.79, rendaFixaDate: "2026-09-20", cdb: { pctCdi: 101.5, cdiAnnual: 13.65, principal: 17523, since: "2026-06-01", moves: [{ date: "2026-10-01", amount: 500 }] } } };
+  const mig = S.migrarParaAplicacoes(velho);
+  assert.deepEqual(S.cdbTranches(mig).map((t) => t.principal), [17523, 500]);
+  assert.ok(S.rendaFixaNow(mig, dia10) > 18000, "continua rendendo depois da migração");
+  // LCI/LCA sem IR
+  const lci = S.trancheInfo(mkc([{ ...ap("L", "2026-06-01", 1000, 90), isento: true }]), { ...ap("L", "2026-06-01", 1000, 90), isento: true }, dia10);
+  assert.equal(lci.ir, 0);
+  // projeção por aplicação: sobe, líquido < bruto, aporte soma
+  const p0 = C.cdbProjecao(c, 12, 0, dia10), p1 = C.cdbProjecao(c, 12, 500, dia10);
+  assert.ok(p0[12].bruto > p0[0].bruto * 1.1 && p0[12].liquido < p0[12].bruto);
+  assert.ok(p1[12].bruto > p0[12].bruto + 6000);
+  const pf = C.proximaFaixa(c, dia10)!;
+  assert.equal(pf.ultima, false);
+  if (!pf.ultima) { assert.equal(pf.em, 181 - 154, "a primeira a cair de faixa é a de 09/06 (154 dias, 20% aos 181)"); assert.equal(pf.nova, 20); }
+}
+console.log("cdb por aplicação ok");
+{
+  // ---- gasto do pai que ficou fora do crédito (é o que faz "ele me deve" não aparecer) ----
+  const S = require("../lib/store") as typeof import("../lib/store");
+  const tx = (id: string, date: string, amount: number, category: string) => ({ id, date, description: id, amount, category, review: false });
+  let p: import("../lib/types").Data = { version: 1, father: [], rules: [], lastBackup: null,
+    txs: [tx("a", "2026-10-02", -500, "fathers_expense"), tx("b", "2026-10-03", 200, "income_fathers"), tx("c", "2026-10-04", -50, "var_food")],
+    config: { ...S.DEFAULT_CONFIG, accountBalance: 1000, bills: [], fatherCreditStart: 0, rendaFixa: 0 } };
+  assert.deepEqual(S.fatherPending(p).map((t) => t.id), ["a", "b"], "lançamentos do pai sem crédito aparecem como pendentes");
+  assert.equal(S.moneyParts(p).doPai, 0, "enquanto pendentes, o crédito não reflete");
+  p = S.syncFather(p, S.fatherPending(p));
+  assert.equal(S.fatherPending(p).length, 0);
+  assert.equal(S.fatherBalance(p), -300, "500 gastos e 200 recebidos: ele me deve 300");
+  assert.equal(S.moneyParts(p).doPai, 300, "agora conta no total");
+  // um ajuste de hoje reconcilia tudo que veio antes
+  const aj = S.fatherSet({ ...p, father: [] }, 700, "ajuste");
+  assert.equal(S.fatherPending(aj).length, 0, "ajuste dado depois dos lançamentos já os cobre");
+}
+console.log("pai pendente ok");

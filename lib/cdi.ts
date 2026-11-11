@@ -1,7 +1,7 @@
 // CDI de cada dia, direto do Banco Central (série 12 do SGS, pública e grátis).
 // Só a taxa vem da internet; nenhum dado seu sai do iPhone.
 import { localDay } from "./format";
-import { getData, update } from "./store";
+import { cdbDesde, getData, update } from "./store";
 
 const LAST = "cdi-fetched";
 const STATUS = "cdi-status";
@@ -36,15 +36,15 @@ const guarda = (r: CdiResultado) => { try { localStorage.setItem(STATUS, JSON.st
 
 /** Busca o CDI desde a última conferência do CDB. Sem `force`, no máximo a cada 6 horas. */
 export async function refreshCdi(force = false): Promise<CdiResultado> {
-  const { rendaFixa, rendaFixaDate } = getData().config;
-  if (!rendaFixa || !rendaFixaDate) return { ok: false, msg: "Confira o valor do CDB com o C6 primeiro: sem ele o app não sabe de onde contar." };
+  const desde = cdbDesde(getData());
+  if (!desde) return { ok: false, msg: "Cadastre as aplicações ou confira o valor do CDB com o C6 primeiro: sem isso o app não sabe de onde contar." };
   try {
     if (!force && Date.now() - Number(localStorage.getItem(LAST) || 0) < 6 * 3600e3) return { ok: true, msg: "Buscado há pouco." };
   } catch {
     /* sem storage: busca mesmo assim */
   }
   // Começa uma semana antes da conferência: nunca fica um período vazio, e a última taxa vem junto.
-  const url = `https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados?formato=json&dataInicial=${br(menos(rendaFixaDate, 7))}&dataFinal=${br(localDay())}`;
+  const url = `https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados?formato=json&dataInicial=${br(menos(desde, 7))}&dataFinal=${br(localDay())}`;
   let status = 0, corpo = "";
   try {
     const r = await fetch(url);

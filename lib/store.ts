@@ -3,12 +3,12 @@ import { classify, detectPassthroughs, normalize } from "./classifier";
 import { catName, typeOf } from "./categories";
 import { localDay } from "./format";
 import type { ProjectionInput } from "./projections";
-import type { Bill, Config, Data, Envelope, FatherEntry, Invoice, ParsedTransaction, Receivable, Rule, Tx } from "./types";
+import type { Bill, CdbTranche, Config, Data, Envelope, FatherEntry, Invoice, ParsedTransaction, Receivable, Rule, Tx } from "./types";
 
 const KEY = "financas:v1";
 
 export const DEFAULT_PREFS: Config["prefs"] = {
-  name: "", hideOnStart: true, avgMonths: 3, economyPct: 30, areasCount: 6, alertPct: 80, backupDays: 14, payday: 0, countReceivables: true, birth: "", returnPct: 10,
+  name: "", hideOnStart: true, avgMonths: 3, economyPct: 30, areasCount: 6, alertPct: 80, backupDays: 14, payday: 0, countReceivables: true, countInvoices: false, anim: true, birth: "", returnPct: 10,
 };
 
 export const DEFAULT_CONFIG: Config = {
@@ -88,7 +88,8 @@ function withDefaults(d: Data): Data {
   // CDB digitado numa versão antiga ficou sem data: sem ela não rende nunca.
   // Passa a render a partir de hoje.
   if (config.rendaFixa > 0 && !config.rendaFixaDate) config.rendaFixaDate = localDay();
-  return { ...empty(), ...d, config };
+  const out = { ...empty(), ...d, config };
+  return config.rendaFixa > 0 && !(config.cdb.tranches ?? []).length ? migrarParaAplicacoes(out) : out;
 }
 
 export function getData(): Data {
@@ -158,6 +159,16 @@ export function useData(): Data {
 
 // ---------- saldos derivados ----------
 
+/**
+ * Gasto ou entrada do pai que ainda não entrou no crédito dele (e é mais novo que o último ajuste do crédito).
+ * É o que faz "o pai me deve" parecer não contar: o lançamento existe, mas não foi para o crédito.
+ */
+export function fatherPending(d: Data): Tx[] {
+  const ligados = new Set(d.father.map((e) => e.txId).filter(Boolean));
+  const ult = d.father.length ? d.father[d.father.length - 1].date : "";
+  return d.txs.filter((t) => !t.card && (t.category === "income_fathers" || t.category === "fathers_expense") && !ligados.has(t.id) && t.date > ult);
+}
+
 export const fatherBalance = (d: Data) =>
   d.father.length ? d.father[d.father.length - 1].balanceAfter : d.config.fatherCreditStart;
 
@@ -185,10 +196,10 @@ const addDay = (iso: string, n: number) => {
  * por vez. Usa o CDI real de cada dia (Banco Central); nos dias que o BC ainda
  * não publicou, a última taxa conhecida. Feriado não tem CDI: não rende.
  */
-function accrue(d: Data, valor: number, de: string, ate: string): number {
+function accrue(d: Data, valor: number, de: string, ate: string, pctCdi = d.config.cdb.pctCdi): number {
   if (ate <= de) return valor;
-  const { cdb, cdiDaily } = d.config;
-  const pct = cdb.pctCdi / 100;
+  const { cdiDaily } = d.config;
+  const pct = pctCdi / 100;
   const pub = Object.keys(cdiDaily || {}).sort();
   const ultimaPub = pub.length ? pub[pub.length - 1] : "";
   let f = 1;
@@ -204,6 +215,7 @@ function accrue(d: Data, valor: number, de: string, ate: string): number {
  * um dia só entra no dia seguinte).
  */
 export function rendaFixaNow(d: Data, now = new Date()): number {
+  if (usaTranches(d)) return r2(cdbTranches(d).reduce((s, t) => s + trancheValue(d, t, now), 0));
   const { rendaFixa, rendaFixaDate, cdb } = d.config;
   const hoje = localDay(now);
   const moves = [...(cdb.moves || [])].filter((m) => m.date <= hoje).sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -221,7 +233,7 @@ export function rendaFixaNow(d: Data, now = new Date()): number {
 
 /** Total aplicado hoje: o da conferência mais o que entrou ou saiu depois. */
 export const cdbPrincipalNow = (d: Data, now = new Date()) =>
-  r2(d.config.cdb.principal + (d.config.cdb.moves || []).filter((m) => m.date <= localDay(now)).reduce((s, m) => s + (m.principal ?? m.amount), 0));
+  usaTranches(d) ? r2(cdbTranches(d).filter((t) => t.date <= localDay(now)).reduce((s, t) => s + t.principal, 0)) : r2(d.config.cdb.principal + (d.config.cdb.moves || []).filter((m) => m.date <= localDay(now)).reduce((s, m) => s + (m.principal ?? m.amount), 0));
 
 /** Você conferiu o valor no C6: recomeça daí e registra quanto o app tinha errado. */
 export function conferirCdb(d: Data, c6: number, aplicado: number, now = new Date()): Data {
@@ -239,6 +251,74 @@ export function conferirCdb(d: Data, c6: number, aplicado: number, now = new Dat
   };
 }
 
+// ---------- aplicações (uma linha por aplicação, como no C6) ----------
+
+/**
+ * Converte o CDB de um valor só (modelo antigo) em aplicações: a conferência vira uma aplicação
+ * e cada aplicação posterior vira outra, com a sua data.
+ */
+export function migrarParaAplicacoes(d: Data): Data {
+  const { rendaFixa, rendaFixaDate, cdb } = d.config;
+  if (!(rendaFixa > 0)) return d;
+  const base: CdbTranche = {
+    id: uid(), name: "CDB", date: cdb.since || rendaFixaDate, principal: r2(cdb.principal || rendaFixa), pct: cdb.pctCdi,
+    checkDate: addDay(rendaFixaDate, -1), checkValue: r2(rendaFixa),
+  };
+  const novas: CdbTranche[] = (cdb.moves ?? []).filter((m) => m.amount > 0).map((m) => ({
+    id: uid(), name: "CDB", date: m.date, principal: r2(m.principal ?? m.amount), pct: cdb.pctCdi, txId: m.txId,
+  }));
+  return { ...d, config: { ...d.config, cdb: { ...cdb, tranches: [base, ...novas], moves: [] } } };
+}
+
+/** Corta no centavo, como o banco faz com o IR (não arredonda para cima). */
+const floorCent = (n: number) => Math.floor(n * 100 + 1e-6) / 100;
+const diasEntre = (a: string, b: string) => Math.floor((Date.parse(b + "T12:00:00") - Date.parse(a + "T12:00:00")) / 86400000);
+
+export const cdbTranches = (d: Data): CdbTranche[] => (d.config.cdb.tranches ?? []).filter((t) => !t.closed);
+export const usaTranches = (d: Data) => (d.config.cdb.tranches ?? []).length > 0;
+
+/** Valor bruto de uma aplicação hoje (o CDI de ontem é o último que entra, como no C6). */
+export function trancheValue(d: Data, t: CdbTranche, now = new Date()): number {
+  const hoje = localDay(now);
+  if (t.date > hoje || (t.closed && t.closed <= hoje)) return 0;
+  const ontem = addDay(hoje, -1);
+  if (t.checkDate && t.checkValue !== undefined && ontem >= t.checkDate) return r2(accrue(d, t.checkValue, t.checkDate, ontem, t.pct));
+  return r2(accrue(d, t.principal, addDay(t.date, -1), ontem, t.pct));
+}
+
+export interface TrancheInfo {
+  t: CdbTranche; value: number; rendimento: number; ir: number; aliquota: number; liquido: number; dias: number;
+  proxima: { em: number; data: string; nova: number } | null;
+}
+/** Tudo de uma aplicação: valor, rendimento, IR (da faixa dela), líquido e quando o IR cai. */
+export function trancheInfo(d: Data, t: CdbTranche, now = new Date()): TrancheInfo {
+  const hoje = localDay(now);
+  const value = trancheValue(d, t, now);
+  const rendimento = r2(Math.max(0, value - t.principal));
+  const dias = Math.max(0, diasEntre(t.date, hoje));
+  const aliquota = t.isento ? 0 : irRate(dias);
+  const ir = floorCent(rendimento * (aliquota / 100));
+  const alvo = t.isento ? undefined : [181, 361, 721].find((f) => f > dias);
+  return {
+    t, value, rendimento, ir, aliquota, liquido: r2(value - ir), dias,
+    proxima: alvo === undefined ? null : { em: alvo - dias, data: addDay(hoje, alvo - dias), nova: irRate(alvo) },
+  };
+}
+export const cdbItens = (d: Data, now = new Date()) => cdbTranches(d).map((t) => trancheInfo(d, t, now)).sort((a, b) => (a.t.date < b.t.date ? -1 : 1));
+
+/** De quando precisamos do CDI do Banco Central. */
+export function cdbDesde(d: Data): string {
+  const ts = cdbTranches(d);
+  if (ts.length) return ts.reduce((m, t) => { const x = t.checkDate ?? t.date; return !m || x < m ? x : m; }, "");
+  return d.config.rendaFixaDate;
+}
+
+/** Cria a aplicação que corresponde a um lançamento de CDB (modo por aplicação). */
+function trancheDeLancamento(d: Data, tx: { id: string; date: string; amount: number }): CdbTranche {
+  const ult = [...cdbTranches(d)].sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+  return { id: uid(), name: ult?.name ?? "CDB", date: tx.date, principal: r2(-tx.amount), pct: ult?.pct ?? d.config.cdb.pctCdi, due: undefined, isento: ult?.isento, txId: tx.id };
+}
+
 /** Última taxa diária conhecida (do BC), senão a estimada pela anual. */
 export function lastCdi(d: Data): number {
   const k = Object.keys(d.config.cdiDaily || {}).sort().pop();
@@ -246,7 +326,10 @@ export function lastCdi(d: Data): number {
 }
 
 /** Quanto o CDB rende num dia útil, no valor de hoje (bruto). */
-export const cdbPerDay = (d: Data) => r2(rendaFixaNow(d) * (lastCdi(d) / 100) * (d.config.cdb.pctCdi / 100));
+export const cdbPerDay = (d: Data) =>
+  usaTranches(d)
+    ? r2(cdbTranches(d).reduce((s, t) => s + trancheValue(d, t) * (lastCdi(d) / 100) * (t.pct / 100), 0))
+    : r2(rendaFixaNow(d) * (lastCdi(d) / 100) * (d.config.cdb.pctCdi / 100));
 
 /** Tabela regressiva do IR sobre o rendimento, pelos dias desde a aplicação. */
 export const irRate = (dias: number) => (dias <= 180 ? 22.5 : dias <= 360 ? 20 : dias <= 720 ? 17.5 : 15);
@@ -256,6 +339,15 @@ export const irRate = (dias: number) => (dias <= 180 ? 22.5 : dias <= 360 ? 20 :
  * aplicação, usa a alíquota mais alta (22,5%) para não prometer o que não tem.
  */
 export function cdbNet(d: Data, now = new Date()) {
+  if (usaTranches(d)) {
+    const itens = cdbItens(d, now);
+    const bruto = r2(itens.reduce((s, i) => s + i.value, 0));
+    const principal = r2(itens.reduce((s, i) => s + i.t.principal, 0));
+    const ir = r2(itens.reduce((s, i) => s + i.ir, 0));
+    const rendimento = r2(Math.max(0, bruto - principal));
+    const dias = itens.length ? Math.max(...itens.map((i) => i.dias)) : null;
+    return { bruto, rendimento, aliquota: rendimento > 0 ? Math.round((ir / rendimento) * 1000) / 10 : itens.length ? Math.min(...itens.map((i) => i.aliquota)) : 22.5, ir, liquido: r2(bruto - ir), dias };
+  }
   const bruto = rendaFixaNow(d, now);
   const { since } = d.config.cdb;
   const principal = cdbPrincipalNow(d, now);
@@ -290,7 +382,8 @@ export function invoiceOpen(d: Data, inv: Invoice): number {
 }
 
 /** Tudo o que você deve no cartão (faturas importadas ainda não pagas). */
-export const cardDebt = (d: Data) => r2((d.config.invoices || []).reduce((s, i) => s + invoiceOpen(d, i), 0));
+export const cardDebt = (d: Data) =>
+  d.config.prefs?.countInvoices ? r2((d.config.invoices || []).reduce((s, i) => s + invoiceOpen(d, i), 0)) : 0; // só desconta se você ligar em Ajustes
 
 export const toggleInvoicePaid = (d: Data, id: string): Data => ({
   ...d, config: { ...d.config, invoices: d.config.invoices.map((i) => (i.id === id ? { ...i, paidManual: !i.paidManual } : i)) },
@@ -320,7 +413,8 @@ export function moneyParts(d: Data, now = new Date()) {
   const doPai = r2(Math.max(0, -pai));
   const pessoas = d.config.prefs?.countReceivables === false ? 0 : receivablesOpen(d);
   const aReceber = r2(doPai + pessoas);
-  return { disponivel, cdb, doPai, pessoas, aReceber, fatura, conta: d.config.accountBalance, total: r2(disponivel + cdb + aReceber) };
+  const paiGuardado = r2(Math.max(0, pai)); // dinheiro do seu pai que está na sua conta (não é seu)
+  return { disponivel, cdb, doPai, paiGuardado, pessoas, aReceber, fatura, conta: d.config.accountBalance, total: r2(disponivel + cdb + aReceber) };
 }
 
 // ---------- a receber (quem te deve) ----------
@@ -484,11 +578,35 @@ export function importParsed(
   // Cada movimento rende a partir da própria data. O que veio antes da conferência
   // no C6 já está dentro do valor conferido: não entra de novo.
   const apagados = new Set(d.txs.filter((t) => !kept.includes(t)).map((t) => t.id));
-  let moves = (cfg.cdb.moves || []).filter((m) => !m.txId || !apagados.has(m.txId));
-  for (const t of txs.filter((x) => typeOf(x.category) === "savings")) {
-    if (!cfg.rendaFixaDate || t.date > cfg.rendaFixaDate) moves = [...moves, { date: t.date, amount: r2(-t.amount), txId: t.id }];
+  const poupa = txs.filter((x) => typeOf(x.category) === "savings");
+  if (usaTranches(d)) {
+    // Por aplicação: o lançamento manual que o extrato substituiu passa o vínculo para o lançamento de verdade,
+    // sem perder o que você já ajustou (taxa, nome, conferência). Aplicação já conhecida não vira outra.
+    const livres = poupa.filter((x) => x.amount < 0);
+    const usados = new Set<string>();
+    const acha = (date: string, valor: number) => livres.find((x) => !usados.has(x.id) && x.date === date && Math.abs(-x.amount - valor) < 0.01);
+    let ts = (cfg.cdb.tranches ?? []).flatMap((tr) => {
+      if (!tr.txId || !apagados.has(tr.txId)) return [tr];
+      const novo = acha(tr.date, tr.principal);
+      if (!novo) return []; // o lançamento sumiu sem substituto: a aplicação também
+      usados.add(novo.id);
+      return [{ ...tr, txId: novo.id }];
+    });
+    const ultimaConferencia = ts.reduce((m, tr) => (tr.checkDate && tr.checkDate > m ? tr.checkDate : m), "");
+    for (const x of livres) {
+      if (usados.has(x.id)) continue;
+      const igual = ts.find((tr) => !tr.txId && tr.date === x.date && Math.abs(tr.principal + x.amount) < 0.01);
+      if (igual) ts = ts.map((tr) => (tr === igual ? { ...tr, txId: x.id } : tr));
+      else if (!ultimaConferencia || x.date > ultimaConferencia) ts = [...ts, trancheDeLancamento({ ...d, config: { ...d.config, cdb: { ...d.config.cdb, tranches: ts } } }, x)];
+    }
+    cfg.cdb = { ...cfg.cdb, tranches: ts };
+  } else {
+    let moves = (cfg.cdb.moves || []).filter((m) => !m.txId || !apagados.has(m.txId));
+    for (const t of poupa) {
+      if (!cfg.rendaFixaDate || t.date > cfg.rendaFixaDate) moves = [...moves, { date: t.date, amount: r2(-t.amount), txId: t.id }];
+    }
+    cfg.cdb = { ...cfg.cdb, moves };
   }
-  cfg.cdb = { ...cfg.cdb, moves };
 
   return {
     data: syncFather({ ...d, txs: [...kept, ...txs], config: cfg }, txs),
@@ -616,13 +734,19 @@ export const setLock = (d: Data, patch: Partial<Data["config"]["lock"]>): Data =
  */
 export function addManual(
   d: Data,
-  t: { date: string; description: string; amount: number; category: string }
+  t: { date: string; description: string; amount: number; category: string },
+  opts: { semCdb?: boolean } = {}
 ): Data {
   const tx: Tx = { id: uid(), ...t, review: false, manual: true };
   const cfg = { ...d.config };
   cfg.accountBalance = r2(cfg.accountBalance + t.amount);
-  if (typeOf(t.category) === "savings" && (!cfg.rendaFixaDate || t.date >= cfg.rendaFixaDate)) {
-    cfg.cdb = { ...cfg.cdb, moves: [...(cfg.cdb.moves || []), { date: t.date, amount: r2(-t.amount), txId: tx.id }] };
+  if (typeOf(t.category) === "savings" && !opts.semCdb) {
+    if (usaTranches(d)) {
+      // aplicação nova vira uma aplicação; resgate é registrado na aba CDB (qual aplicação saiu)
+      if (t.amount < 0) cfg.cdb = { ...cfg.cdb, tranches: [...(cfg.cdb.tranches ?? []), trancheDeLancamento(d, { id: tx.id, date: t.date, amount: t.amount })] };
+    } else if (!cfg.rendaFixaDate || t.date >= cfg.rendaFixaDate) {
+      cfg.cdb = { ...cfg.cdb, moves: [...(cfg.cdb.moves || []), { date: t.date, amount: r2(-t.amount), txId: tx.id }] };
+    }
   }
   if (t.date > cfg.balanceDate) cfg.balanceDate = t.date;
   return syncFather({ ...d, txs: [...d.txs, tx], config: cfg }, [tx]);
@@ -694,7 +818,7 @@ export function deleteTx(d: Data, id: string): Data {
   const cfg = { ...d.config };
   if (t?.manual) {
     cfg.accountBalance = r2(cfg.accountBalance - t.amount);
-    cfg.cdb = { ...cfg.cdb, moves: (cfg.cdb.moves || []).filter((m) => m.txId !== id) };
+    cfg.cdb = { ...cfg.cdb, moves: (cfg.cdb.moves || []).filter((m) => m.txId !== id), ...(cfg.cdb.tranches ? { tranches: cfg.cdb.tranches.filter((tr) => tr.txId !== id) } : {}) };
   }
   return recalcFather({ ...d, config: cfg, txs: d.txs.filter((x) => x.id !== id), father: d.father.filter((e) => e.txId !== id) });
 }

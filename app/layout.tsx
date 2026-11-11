@@ -4,10 +4,10 @@ import "./globals.css";
 const base = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export const metadata: Metadata = {
-  title: "Rumo",
+  title: "Órbita",
   description: "Dinheiro, metas e treino. Tudo no seu iPhone.",
   manifest: `${base}/manifest.webmanifest`,
-  appleWebApp: { capable: true, title: "Rumo", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Órbita", statusBarStyle: "default" },
   icons: { apple: `${base}/icon-180.png`, icon: `${base}/icon-192.png` },
 };
 

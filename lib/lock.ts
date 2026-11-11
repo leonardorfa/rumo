@@ -24,8 +24,8 @@ export async function registerFaceId(): Promise<string> {
   const cred = (await navigator.credentials.create({
     publicKey: {
       challenge: rand(32),
-      rp: { name: "Rumo" },
-      user: { id: rand(16), name: "rumo", displayName: "Rumo" },
+      rp: { name: "Órbita" },
+      user: { id: rand(16), name: "orbita", displayName: "Órbita" },
       pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
       authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
       timeout: 60000,

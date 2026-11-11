@@ -1,6 +1,7 @@
 "use client";
 
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
+import { animOn, useAnim } from "@/lib/anim";
 import {
   Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart,
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -33,7 +34,7 @@ export function CategoryBars({ data, onSelect }: { data: CatDatum[]; onSelect?: 
           <XAxis dataKey="icon" tick={{ fontSize: 16 }} tickLine={false} axisLine={false} interval={0} />
           <YAxis tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 42} tickFormatter={short} />
           {!hidden && <Tooltip {...tip} cursor={{ fill: "var(--fill)" }} formatter={(v: number, _n, p) => [brl(v), (p?.payload as CatDatum)?.name]} labelFormatter={() => ""} />}
-          <Bar dataKey="value" radius={[6, 6, 0, 0]} isAnimationActive={false} cursor="pointer"
+          <Bar dataKey="value" radius={[6, 6, 0, 0]} isAnimationActive={animOn()} animationDuration={900} cursor="pointer"
             onClick={(d: { key?: string }) => d?.key && onSelect?.(d.key)}>
             {data.map((d, i) => <Cell key={d.key} fill={SERIES[i % SERIES.length]} />)}
           </Bar>
@@ -55,7 +56,7 @@ export function CategoryDonut({ data, onSelect }: { data: CatDatum[]; onSelect?:
           <PieChart>
             {!hidden && <Tooltip {...tip} formatter={(v: number, _n, p) => [brl(v), (p?.payload as CatDatum)?.name]} />}
             <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="100%" paddingAngle={2}
-              stroke="var(--card)" strokeWidth={2} isAnimationActive={false}
+              stroke="var(--card)" strokeWidth={2} isAnimationActive={animOn()} animationDuration={900}
               onClick={(d: { key?: string }) => d?.key && onSelect?.(d.key)}>
               {data.map((d, i) => <Cell key={d.key} fill={SERIES[i % SERIES.length]} cursor="pointer" />)}
             </Pie>
@@ -100,8 +101,8 @@ export function CumulativeChart({ data, teto, labels }: {
               <ReferenceLine y={teto} stroke="var(--alert)" strokeDasharray="4 4"
                 label={{ value: hidden ? "Teto" : `Teto ${brl0(teto)}`, position: "insideTopRight", fill: "var(--alert)", fontSize: 11 }} />
             )}
-            <Line dataKey="anterior" stroke="var(--ink3)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls={false} isAnimationActive={false} />
-            <Line dataKey="atual" stroke="var(--meu)" strokeWidth={2.5} dot={false} connectNulls={false} isAnimationActive={false} />
+            <Line dataKey="anterior" stroke="var(--ink3)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls={false} isAnimationActive={animOn()} animationDuration={900} />
+            <Line dataKey="atual" stroke="var(--meu)" strokeWidth={2.5} dot={false} connectNulls={false} isAnimationActive={animOn()} animationDuration={900} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -123,7 +124,7 @@ export function ProjectionChart({ data, goal, name = "Saldo projetado" }: { data
           {!hidden && <Tooltip {...tip} formatter={(v: number) => [brl(v), name]} />}
           <ReferenceLine y={goal} stroke="var(--meta)" strokeWidth={2} strokeDasharray="6 4"
             label={{ value: hidden ? "Meta" : `Meta ${brl0(goal)}`, position: "insideTopLeft", fill: "var(--ink2)", fontSize: 11 }} />
-          <Line dataKey="value" stroke="var(--meu)" strokeWidth={2.5} isAnimationActive={false}
+          <Line dataKey="value" stroke="var(--meu)" strokeWidth={2.5} isAnimationActive={animOn()} animationDuration={900}
             dot={{ r: 4, fill: "var(--meu)", stroke: "var(--card)", strokeWidth: 2 }} activeDot={{ r: 6 }} />
         </LineChart>
       </ResponsiveContainer>
@@ -144,7 +145,7 @@ export function ForecastChart({ data }: { data: { label: string; value: number }
           <YAxis domain={[min, "auto"]} tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 44} tickFormatter={short} />
           {!hidden && <Tooltip {...tip} formatter={(v: number) => [brl(v), "Seu na conta"]} />}
           <ReferenceLine y={0} stroke={min < 0 ? "var(--alert)" : "var(--ink3)"} strokeDasharray={min < 0 ? "4 4" : undefined} />
-          <Line type="monotone" dataKey="value" stroke={min < 0 ? "var(--alert)" : "var(--meu)"} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="value" stroke={min < 0 ? "var(--alert)" : "var(--meu)"} strokeWidth={2.5} dot={false} isAnimationActive={animOn()} animationDuration={900} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -164,7 +165,7 @@ export function FatherChart({ data }: { data: { label: string; value: number }[]
           <YAxis tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 44} tickFormatter={short} />
           {!hidden && <Tooltip {...tip} formatter={(v: number) => [brl(v), "Crédito do pai"]} />}
           <ReferenceLine y={0} stroke="var(--ink3)" />
-          <Line type="stepAfter" dataKey="value" stroke="var(--pai)" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+          <Line type="stepAfter" dataKey="value" stroke="var(--pai)" strokeWidth={2.5} dot={false} isAnimationActive={animOn()} animationDuration={900} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -194,8 +195,8 @@ export function TrendChart({ data, goal, name, fmt, goalLabel, dom }: {
             <ReferenceLine y={goal} stroke="var(--meta)" strokeWidth={2} strokeDasharray="6 4"
               label={{ value: hidden ? "Meta" : `${goalLabel ?? "Meta"} ${f(goal)}`, position: "insideTopLeft", fill: "var(--ink2)", fontSize: 11 }} />
           )}
-          <Line dataKey="extra" stroke="var(--ink3)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls isAnimationActive={false} />
-          <Line dataKey="value" stroke="var(--meu)" strokeWidth={2.5} connectNulls isAnimationActive={false}
+          <Line dataKey="extra" stroke="var(--ink3)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls isAnimationActive={animOn()} animationDuration={900} />
+          <Line dataKey="value" stroke="var(--meu)" strokeWidth={2.5} connectNulls isAnimationActive={animOn()} animationDuration={900}
             dot={{ r: 3.5, fill: "var(--meu)", stroke: "var(--card)", strokeWidth: 2 }} activeDot={{ r: 5.5 }} />
         </LineChart>
       </ResponsiveContainer>
@@ -214,7 +215,7 @@ export function BarsChart({ data, name, color = "var(--meu)" }: { data: { label:
           <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval="preserveStartEnd" />
           <YAxis tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 40} tickFormatter={(v: number) => (v >= 1000 ? short(v) : String(v))} allowDecimals={false} />
           {!hidden && <Tooltip {...tip} cursor={{ fill: "var(--fill)" }} formatter={(v: number) => [v.toLocaleString("pt-BR"), name]} />}
-          <Bar dataKey="value" fill={color} radius={[6, 6, 0, 0]} isAnimationActive={false} />
+          <Bar dataKey="value" fill={color} radius={[6, 6, 0, 0]} isAnimationActive={animOn()} animationDuration={900} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -233,9 +234,44 @@ export function MiniTrend({ data, unit }: { data: { label: string; value: number
           <XAxis dataKey="label" hide />
           <YAxis domain={[lo - pad, hi + pad]} hide />
           {!hidden && <Tooltip {...tip} formatter={(v: number) => [`${v.toLocaleString("pt-BR")} ${unit}`, "Carga"]} />}
-          <Line dataKey="value" stroke="var(--meu)" strokeWidth={2.5} isAnimationActive={false} dot={{ r: 3.5, fill: "var(--meu)", stroke: "var(--card)", strokeWidth: 2 }} />
+          <Line dataKey="value" stroke="var(--meu)" strokeWidth={2.5} isAnimationActive={animOn()} animationDuration={900} dot={{ r: 3.5, fill: "var(--meu)", stroke: "var(--card)", strokeWidth: 2 }} />
         </LineChart>
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** Colunas em 3D (CSS puro): crescem ao aparecer. `fmt` formata o valor escrito embaixo de cada coluna. */
+export function Bars3D({ data, name, fmt, color }: { data: { label: string; value: number; color?: string }[]; name: string; fmt?: (v: number) => string; color?: string }) {
+  const hidden = useContext(HideCtx);
+  const anim = useAnim();
+  const [cresceu, setCresceu] = useState(!anim);
+  useEffect(() => { const t = setTimeout(() => setCresceu(true), 80); return () => clearTimeout(t); }, []);
+  if (!data.length) return null;
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const H = 140, D = 16, W = Math.max(18, Math.min(34, Math.floor(250 / data.length)));
+  return (
+    <div className="w-full overflow-hidden" style={{ perspective: 1000 }} role="img" aria-label={`Gráfico 3D de ${name}`}>
+      <div className="flex items-end justify-around gap-1 pt-4 pb-1" style={{ transform: "rotateX(-16deg) rotateY(-22deg) scale(.94)", transformStyle: "preserve-3d" }}>
+        {data.map((d, i) => {
+          const h = cresceu ? Math.max(4, Math.round((d.value / max) * H)) : 2;
+          const cor = d.color ?? color ?? SERIES[i % SERIES.length];
+          const base: React.CSSProperties = { position: "absolute", backfaceVisibility: "hidden", transition: anim ? `all .9s cubic-bezier(.2,.8,.2,1) ${i * 60}ms` : undefined };
+          return (
+            <div key={d.label + i} className="flex flex-col items-center min-w-0" style={{ width: W + D, transformStyle: "preserve-3d" }}>
+              <div style={{ height: H + 4, display: "flex", alignItems: "flex-end", transformStyle: "preserve-3d" }}>
+                <div style={{ position: "relative", width: W, height: h, transformStyle: "preserve-3d", transition: anim ? `height .9s cubic-bezier(.2,.8,.2,1) ${i * 60}ms` : undefined }}>
+                  <div style={{ ...base, left: 0, top: 0, width: W, height: h, background: cor, transform: `translateZ(${D / 2}px)` }} />
+                  <div style={{ ...base, left: (W - D) / 2, top: 0, width: D, height: h, background: `color-mix(in srgb, ${cor} 62%, #000)`, transform: `rotateY(90deg) translateZ(${W / 2}px)` }} />
+                  <div style={{ ...base, left: 0, top: (h - D) / 2, width: W, height: D, background: `color-mix(in srgb, ${cor} 78%, #fff)`, transform: `rotateX(90deg) translateZ(${h / 2}px)` }} />
+                </div>
+              </div>
+              <span className="text-[10px] text-ink3 mt-1.5 truncate max-w-full">{d.label}</span>
+              {!hidden && <span className="text-[10px] text-ink2 truncate max-w-full">{fmt ? fmt(d.value) : d.value.toLocaleString("pt-BR")}</span>}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

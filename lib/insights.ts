@@ -111,7 +111,7 @@ export function forecast30(d: Data, teto: number, now = new Date()) {
   const points: { date: string; label: string; value: number }[] = [];
   let saldo = mineInAccount(d);
   // fatura vencida que o extrato ainda não mostrou paga: conta já hoje
-  for (const inv of d.config.invoices || []) if (inv.due <= localDay(now)) saldo -= invoiceOpen(d, inv);
+  if (d.config.prefs?.countInvoices) for (const inv of d.config.invoices || []) if (inv.due <= localDay(now)) saldo -= invoiceOpen(d, inv);
   const pd = payday(d);
 
   for (let i = 0; i <= 30; i++) {
@@ -129,7 +129,7 @@ export function forecast30(d: Data, teto: number, now = new Date()) {
         const p = parcela(b, mes);
         events.push({ date: iso, label: p ? `${b.name} (${p.n}/${p.total})` : b.name, amount: -b.amount });
       }
-      for (const inv of d.config.invoices || []) {
+      for (const inv of d.config.prefs?.countInvoices ? d.config.invoices || [] : []) {
         const falta = invoiceOpen(d, inv);
         if (inv.due === iso && falta > 0) {
           saldo -= falta;

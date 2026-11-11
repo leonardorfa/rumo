@@ -42,7 +42,7 @@ export default function Lock({ onOpen }: { onOpen: () => void }) {
     <div className="fixed inset-0 z-[70] hero flex flex-col items-center justify-center px-8 text-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/icon-192.png`} alt="" className="w-20 h-20 rounded-[22px] shadow-lg" />
-      <h1 className="text-[26px] font-extrabold mt-2">Rumo</h1>
+      <h1 className="text-[26px] font-extrabold mt-2">Órbita</h1>
       <p className="text-white/70 mt-1 mb-8">Seus dados estão trancados.</p>
 
       <label className="w-full max-w-[280px]">

@@ -43,7 +43,7 @@ export async function shareFile(file: File): Promise<boolean> {
 
 export async function saveBackup(): Promise<boolean> {
   const d = getData();
-  const ok = await shareFile(new File([exportBackup(d)], `rumo-backup-${localDay()}.json`, { type: "application/json" }));
+  const ok = await shareFile(new File([exportBackup(d)], `orbita-backup-${localDay()}.json`, { type: "application/json" }));
   if (ok) {
     setData({ ...d, lastBackup: new Date().toISOString() });
     resetChanges(); // o backup acabou de guardar tudo
@@ -68,4 +68,4 @@ export function toCsv(d: Data): string {
 }
 
 export const exportCsv = () =>
-  shareFile(new File([toCsv(getData())], `rumo-${localDay()}.csv`, { type: "text/csv" }));
+  shareFile(new File([toCsv(getData())], `orbita-${localDay()}.csv`, { type: "text/csv" }));

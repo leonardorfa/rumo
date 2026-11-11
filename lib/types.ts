@@ -54,6 +54,8 @@ export interface Prefs {
   alertPct: number; // avisar quando a área passar desse % do plano
   backupDays: number; // lembrar do backup depois de tantos dias
   countReceivables: boolean; // o que te devem conta no "meu dinheiro"
+  countInvoices: boolean; // a fatura do cartão em aberto desconta do "meu dinheiro"
+  anim: boolean; // animações e gráficos 3D
   birth: string; // data de nascimento (YYYY-MM-DD), para as metas por idade
   returnPct: number; // retorno esperado ao ano, para as metas de longo prazo
   payday: number; // dia do salário (0 = descobrir pelo extrato)
@@ -73,7 +75,8 @@ export interface Config {
   cdb: {
     pctCdi: number; cdiAnnual: number; principal: number; since?: string; // principal e since valem na data da última conferência
     moves?: CdbMove[]; // aplicações e resgates depois da conferência, cada um rende a partir da sua data
-    checks?: { date: string; app: number; c6: number }[]; // o que o app calculou vs o que o C6 mostrou
+    checks?: { date: string; app: number; c6: number; name?: string }[]; // o que o app calculou vs o que o C6 mostrou
+    tranches?: CdbTranche[]; // aplicações (quando existem, mandam no cálculo)
   };
   cdiDaily: Record<string, number>; // CDI de cada dia útil (% ao dia), do Banco Central
   fatherCreditStart: number;
@@ -147,6 +150,24 @@ export interface Fit {
   time: string; // "18:00", só para a agenda
   routines: Routine[];
   workouts: Workout[];
+}
+
+/**
+ * Uma aplicação de renda fixa (CDB, LCI…), como aparece no C6: cada uma tem a sua data,
+ * a sua taxa (% do CDI) e o seu imposto. O total é a soma delas.
+ */
+export interface CdbTranche {
+  id: string;
+  name: string; // "CDB C6 Limite Garantido"
+  date: string; // dia da aplicação (esse dia já rende)
+  principal: number; // quanto está aplicado nela
+  pct: number; // % do CDI desta aplicação
+  due?: string; // vencimento
+  isento?: boolean; // LCI/LCA: sem imposto de renda
+  checkDate?: string; // conferência com o C6: `checkValue` já inclui o CDI até este dia
+  checkValue?: number;
+  closed?: string; // resgatada por inteiro neste dia
+  txId?: string; // lançamento que originou a aplicação
 }
 
 /** Dinheiro que entrou (+) ou saiu (−) do CDB numa data. */

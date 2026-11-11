@@ -135,6 +135,26 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+/* ---------- movimento ---------- */
+@keyframes rise { from { opacity: 0; transform: translateY(16px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+.anim main > div > *:not([role="dialog"]) { animation: rise .55s cubic-bezier(.2,.75,.25,1) both; }
+.anim main > div > *:nth-child(2) { animation-delay: .05s; }
+.anim main > div > *:nth-child(3) { animation-delay: .1s; }
+.anim main > div > *:nth-child(4) { animation-delay: .15s; }
+.anim main > div > *:nth-child(5) { animation-delay: .2s; }
+.anim main > div > *:nth-child(6) { animation-delay: .25s; }
+.anim main > div > *:nth-child(n+7) { animation-delay: .3s; }
+.anim .tilt { transition: transform .3s cubic-bezier(.2,.8,.2,1); will-change: transform; transform: perspective(900px); }
+.anim button:not(:disabled):active, .anim .card:active { transition: transform .12s; }
+.anim button:not(:disabled):active { transform: scale(.97); }
+.anim nav button { transition: background-color .25s, color .25s, transform .12s; }
+.anim .hero { background-size: 160% 160%; animation: brilho 14s ease-in-out infinite alternate; }
+@keyframes brilho { from { background-position: 0% 40%; } to { background-position: 100% 60%; } }
+@media (prefers-reduced-motion: reduce) {
+  .anim *, .anim *::before, .anim *::after { animation: none !important; transition: none !important; }
+}
+
 .pb-tab {
   padding-bottom: calc(160px + env(safe-area-inset-bottom)); /* barra de abas + botões flutuantes */
 }

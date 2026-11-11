@@ -7,17 +7,17 @@ import { computeScenarios } from "@/lib/projections";
 import { byCategory, cumulative, envelopes, ofMonth, variableSpend } from "@/lib/stats";
 import { billPaid, categoryTable, priceChanges, recurringSuggestions, safeToSpend } from "@/lib/insights";
 import { saveBackup } from "@/lib/backup";
-import { billActive, cdbNet, changesSinceBackup, moneyParts, cdbPerDay, dismissRecurring, fatherBalance, monthKey, myMoney, parcela, projectionInput, toggleBillPaid, update, useData } from "@/lib/store";
+import { billActive, cdbNet, changesSinceBackup, fatherPending, moneyParts, cdbPerDay, dismissRecurring, fatherBalance, monthKey, myMoney, parcela, projectionInput, toggleBillPaid, update, useData } from "@/lib/store";
 import type { Data, Tx } from "@/lib/types";
-import { CategoryBars, CategoryDonut, CumulativeChart, type CatDatum } from "./charts";
+import { Bars3D, CategoryBars, CategoryDonut, CumulativeChart, type CatDatum } from "./charts";
 import { TxList, TxRow, TxSheet } from "./Tx";
 import Revisar from "./Revisar";
 import { ReceberCard } from "./Receber";
-import { act, Button, Card, Icons, Money, MonthSwitcher, Progress, Section, Sheet, toast } from "./ui";
+import { act, Button, Card, Icons, Money, MonthSwitcher, Progress, Section, Segmented, Sheet, Tilt, toast } from "./ui";
 
-export default function Home({ month, setMonth, hidden, setHidden, goExtrato, goMeta, goCdb }: {
+export default function Home({ month, setMonth, hidden, setHidden, goExtrato, goMeta, goCdb, goPai }: {
   month: string; setMonth: (m: string) => void; hidden: boolean; setHidden: (h: boolean) => void;
-  goExtrato: () => void; goMeta: () => void; goCdb: () => void;
+  goExtrato: () => void; goMeta: () => void; goCdb: () => void; goPai: () => void;
 }) {
   const d = useData();
   const customs = d.config.customCats;
@@ -29,6 +29,9 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
   const pai = fatherBalance(d);
   const account = d.config.accountBalance;
   const parts = moneyParts(d);
+  const [grafico, setGrafico] = useState<"2d" | "3d">(() => { try { return (localStorage.getItem("grafico-cat") as "2d" | "3d") || "2d"; } catch { return "2d"; } });
+  const mudaGrafico = (g: "2d" | "3d") => { setGrafico(g); try { localStorage.setItem("grafico-cat", g); } catch { /* ok */ } };
+  const pendentes = fatherPending(d);
   const meu = parts.total;
   const teto = useMemo(() => Math.max(0, computeScenarios(projectionInput(d))[0].monthlyVariable), [d]);
   const monthTxs = ofMonth(d.txs, month);
@@ -82,14 +85,14 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
         </Card>
       )}
 
-      <div className="hero card p-5 text-center">
+      <Tilt><div className="hero card p-5 text-center">
         <div className="flex items-center justify-center gap-2 text-white/70 text-[14px]">
           Meu dinheiro total
           <button aria-label={hidden ? "Mostrar valores" : "Esconder valores"} onClick={() => setHidden(!hidden)} className="text-white/70">
             {hidden ? Icons.eyeOff : Icons.eye}
           </button>
         </div>
-        <Money v={meu} className="block text-[40px] leading-tight font-extrabold" />
+        <Money v={meu} count className="block text-[40px] leading-tight font-extrabold" />
         <div className="text-[13px] text-white/70">
           {staleDays === null ? "Importe um extrato para começar"
             : `Saldo do extrato de ${new Date(d.config.balanceDate + "T12:00:00").toLocaleDateString("pt-BR")}`}
@@ -119,6 +122,13 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
               </div>
             )}
           </button>
+          {parts.paiGuardado > 0 && (
+            <button onClick={goPai} className="rounded-xl bg-white/10 p-3 col-span-2 text-left">
+              <div className="text-[12px] text-white/70">Dinheiro do seu pai na conta</div>
+              <Money v={parts.paiGuardado} className="font-bold" />
+              <div className="text-[12px] text-white/70">não é seu: fica fora do total</div>
+            </button>
+          )}
           {parts.aReceber > 0 && (
             <div className="rounded-xl bg-white/10 p-3 col-span-2">
               <div className="text-[12px] text-white/70">A receber</div>
@@ -134,7 +144,18 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
         <div className="text-[12px] text-white/60 mt-3">
           Total = disponível + CDB líquido{parts.aReceber > 0 ? " + a receber" : ""}.
         </div>
-      </div>
+      </div></Tilt>
+
+      {pendentes.length > 0 && (
+        <Card className="mt-3 flex items-center gap-3" onClick={goPai}>
+          <span className="w-10 h-10 rounded-full bg-fill grid place-items-center text-lg" aria-hidden>👨</span>
+          <span className="flex-1 text-[14px]">
+            <span className="block font-semibold">{pendentes.length} lançamento{pendentes.length === 1 ? "" : "s"} do seu pai fora do crédito dele</span>
+            <span className="block text-ink3">Enquanto não entrarem, o que ele te deve (ou você guarda dele) não aparece no total. Toque para acertar.</span>
+          </span>
+          <span className="text-ink3 text-xl" aria-hidden>›</span>
+        </Card>
+      )}
 
       <div className="flex items-center justify-between mt-6 mb-2 px-1">
         <h2 className="text-[20px] font-semibold">No mês</h2>
@@ -207,9 +228,11 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
 
       {cats.length > 0 && (
         <>
-          <Section>Gasto por categoria</Section>
+          <Section action={<Segmented value={grafico} onChange={mudaGrafico} options={[{ value: "2d", label: "Barras" }, { value: "3d", label: "3D" }]} />}>Gasto por categoria</Section>
           <Card>
-            <CategoryBars data={cats} onSelect={abrirCat} />
+            {grafico === "3d"
+              ? <Bars3D name="Gasto por categoria" fmt={brl0} data={cats.map((c) => ({ label: c.icon, value: c.value }))} />
+              : <CategoryBars data={cats} onSelect={abrirCat} />}
             <CatRows rows={tabela.slice(0, 5)} customs={customs} hidden={hidden} onOpen={setCat} />
             {tabela.length > 5 && (
               <button onClick={() => setTodas(true)} className="w-full text-link font-semibold text-[15px] pt-2">

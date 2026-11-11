@@ -2,15 +2,56 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { brl, brlSigned, monthName, shiftMonth } from "@/lib/format";
+import { useAnim } from "@/lib/anim";
 import { getData, setData, update } from "@/lib/store";
 import type { Data } from "@/lib/types";
 
 // ---------- esconder valores (olho, estilo Nubank) ----------
 export const HideCtx = createContext(false);
 
-export function Money({ v, signed, className = "" }: { v: number; signed?: boolean; className?: string }) {
+/** Número que sobe até o valor (só nos destaques, com `count`). */
+function useCountUp(v: number, on: boolean) {
+  const anim = useAnim();
+  const ativo = on && anim;
+  const de = useRef(ativo ? 0 : v);
+  const [x, setX] = useState(ativo ? 0 : v);
+  useEffect(() => {
+    if (!ativo) { de.current = v; setX(v); return; }
+    // Temporizador (e não requestAnimationFrame): o navegador pausa o rAF com a tela apagada ou o app em
+    // segundo plano, e o número ficaria parado no zero. Aqui sempre termina no valor certo.
+    const a = de.current, b = v, t0 = Date.now();
+    const id = setInterval(() => {
+      const k = Math.min(1, (Date.now() - t0) / 900);
+      const val = k >= 1 ? b : a + (b - a) * (1 - (1 - k) ** 3);
+      de.current = val;
+      setX(val);
+      if (k >= 1) clearInterval(id);
+    }, 24);
+    return () => clearInterval(id);
+  }, [v, ativo]);
+  return ativo ? x : v;
+}
+
+export function Money({ v, signed, className = "", count }: { v: number; signed?: boolean; className?: string; count?: boolean }) {
   const hidden = useContext(HideCtx);
-  return <span className={`num ${className}`}>{hidden ? "R$ ••••" : signed ? brlSigned(v) : brl(v)}</span>;
+  const shown = useCountUp(v, !!count && !hidden);
+  return <span className={`num ${className}`}>{hidden ? "R$ ••••" : signed ? brlSigned(shown) : brl(shown)}</span>;
+}
+
+/** Cartão que se inclina para onde você toca (3D leve). */
+export function Tilt({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const anim = useAnim();
+  const mexe = (e: React.PointerEvent) => {
+    const el = ref.current;
+    if (!anim || !el) return;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+    el.style.transform = `perspective(900px) rotateX(${(-y * 8).toFixed(2)}deg) rotateY(${(x * 10).toFixed(2)}deg) scale(1.01)`;
+    el.style.setProperty("--brilho", `${((x + 0.5) * 100).toFixed(0)}%`);
+  };
+  const solta = () => { if (ref.current) ref.current.style.transform = "perspective(900px) rotateX(0deg) rotateY(0deg) scale(1)"; };
+  return <div ref={ref} className={`tilt ${className}`} onPointerMove={mexe} onPointerLeave={solta} onPointerUp={solta} onPointerCancel={solta}>{children}</div>;
 }
 
 // ---------- blocos ----------
@@ -65,9 +106,16 @@ export function Segmented<T extends string>({ value, options, onChange }: {
 export function Progress({ value, max, color = "var(--meu)" }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   const over = max > 0 && value > max;
+  const anim = useAnim();
+  const [w, setW] = useState(anim ? 0 : pct); // entra crescendo
+  useEffect(() => {
+    if (!anim) { setW(pct); return; }
+    const t = setTimeout(() => setW(pct), 40);
+    return () => clearTimeout(t);
+  }, [pct, anim]);
   return (
     <div className="h-2 rounded-full bg-fill overflow-hidden" role="progressbar" aria-valuenow={Math.round(pct)}>
-      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: over ? "var(--alert)" : color }} />
+      <div className="h-full rounded-full" style={{ width: `${w}%`, background: over ? "var(--alert)" : color, transition: anim ? "width .9s cubic-bezier(.2,.8,.2,1)" : undefined }} />
     </div>
   );
 }

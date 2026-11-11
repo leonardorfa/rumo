@@ -1,4 +1,4 @@
-# Rumo
+# Órbita
 
 Dinheiro, metas de vida, treino e CDB num app que roda no iPhone (PWA). Os dados ficam só no aparelho (`localStorage`). Não tem servidor nem conta.
 
