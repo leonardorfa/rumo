@@ -809,12 +809,12 @@ console.log("grupos musculares ok");
   assert.equal(L.pesoLevantado(t, "2026-11-20").dia, 0);
   assert.equal(L.alvosOf(L.setAlvos(t, { cardioMin: 90 })).cardioMin, 90);
   // cripto: custo médio, perda e compra com média ponderada
-  let c = C.salvarCripto(d0, { id: "s", symbol: "sol", name: "Solana", qty: 0.024023172, avgCost: 1373.26 });
-  c = C.definirPreco(c, "s", 441.2, new Date(2026, 10, 12));
+  let c = C.salvarCripto(d0, { id: "s", symbol: "sol", name: "Solana", qty: 0.02, avgCost: 1000 });
+  c = C.definirPreco(c, "s", 500, new Date(2026, 10, 12));
   const p = C.posicao(C.criptoOf(c)[0]);
-  assert.equal(p.investido, 32.99); assert.equal(p.valor, 10.6); assert.equal(p.resultado, -22.39); assert.equal(p.pct, -67.87);
+  assert.equal(p.investido, 20); assert.equal(p.valor, 10); assert.equal(p.resultado, -10); assert.equal(p.pct, -50);
   c = C.comprarCripto(c, "s", 1, 1000);
-  assert.ok(Math.abs(C.criptoOf(c)[0].avgCost - (0.024023172 * 1373.26 + 1000) / 1.024023172) < 1e-9, "média ponderada");
+  assert.ok(Math.abs(C.criptoOf(c)[0].avgCost - (0.02 * 1000 + 1000) / 1.024023172) < 1e-9, "média ponderada");
   c = C.venderCripto(c, "s", 5);
   assert.equal(C.criptoOf(c)[0].qty, 0, "vender mais que tem zera, não fica negativo");
   assert.equal((require("../lib/store") as typeof import("../lib/store")).moneyParts({ ...c, config: { ...c.config, prefs: { ...c.config.prefs, countCripto: false } } }).cripto, 0, "o botão desliga cripto do total");
