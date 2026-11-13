@@ -8,7 +8,7 @@ import type { Bill, CdbTranche, Config, Data, Envelope, FatherEntry, Invoice, Pa
 const KEY = "financas:v1";
 
 export const DEFAULT_PREFS: Config["prefs"] = {
-  name: "", hideOnStart: true, avgMonths: 3, economyPct: 30, areasCount: 6, alertPct: 80, backupDays: 14, payday: 0, countReceivables: true, countInvoices: false, anim: true, birth: "", returnPct: 10,
+  name: "", hideOnStart: true, avgMonths: 3, economyPct: 30, areasCount: 6, alertPct: 80, backupDays: 14, payday: 0, countReceivables: true, countInvoices: false, countCripto: true, anim: true, birth: "", returnPct: 10,
 };
 
 export const DEFAULT_CONFIG: Config = {
@@ -413,8 +413,9 @@ export function moneyParts(d: Data, now = new Date()) {
   const doPai = r2(Math.max(0, -pai));
   const pessoas = d.config.prefs?.countReceivables === false ? 0 : receivablesOpen(d);
   const aReceber = r2(doPai + pessoas);
+  const cripto = d.config.prefs?.countCripto === false ? 0 : r2((d.cripto ?? []).reduce((s, c) => s + c.qty * (c.price ?? c.avgCost), 0));
   const paiGuardado = r2(Math.max(0, pai)); // dinheiro do seu pai que está na sua conta (não é seu)
-  return { disponivel, cdb, doPai, paiGuardado, pessoas, aReceber, fatura, conta: d.config.accountBalance, total: r2(disponivel + cdb + aReceber) };
+  return { disponivel, cdb, cripto, doPai, paiGuardado, pessoas, aReceber, fatura, conta: d.config.accountBalance, total: r2(disponivel + cdb + cripto + aReceber) };
 }
 
 // ---------- a receber (quem te deve) ----------

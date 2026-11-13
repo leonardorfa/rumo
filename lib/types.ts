@@ -59,6 +59,7 @@ export interface Prefs {
   birth: string; // data de nascimento (YYYY-MM-DD), para as metas por idade
   returnPct: number; // retorno esperado ao ano, para as metas de longo prazo
   payday: number; // dia do salário (0 = descobrir pelo extrato)
+  countCripto: boolean; // cripto entra no "meu dinheiro"
 }
 
 export interface Config {
@@ -122,6 +123,16 @@ export interface Goal {
   returnPct?: number; // net: retorno esperado ao ano (senão o padrão de Ajustes)
 }
 
+export interface Agua {
+  metaMl: number; // por dia
+  horarios: string[]; // "12:00": a meta do dia é dividida igual entre eles (lembretes)
+  copoMl: number; // tamanho do botão rápido
+  log: Record<string, number>; // dia -> ml bebidos
+}
+export interface Alvos {
+  cardioMin: number; // minutos de cardio por semana
+  series: Record<string, number>; // grupo muscular -> séries por semana
+}
 export interface Cardio { tipo: string; min: number }
 export interface Routine {
   id: string;
@@ -139,6 +150,7 @@ export interface Workout {
   note?: string;
   cardio?: Cardio; // o que você fez de cardio
   sets: { ex: string; kg: number; reps: number }[];
+  pend?: string[]; // exercícios do treino que ainda não têm série anotada (continuam ali ao editar)
 }
 /** O que muda num dia da semana em relação à rotina (ex.: sábado com ênfase em ombro). */
 export interface DayExtra { focus?: string; minutes?: number; cardio?: Cardio; extra?: string[] }
@@ -149,6 +161,8 @@ export interface Fit {
   days: Record<string, string>; // "0" domingo … "6" sábado → id da rotina ("" = treino sem rotina); ausente = descanso
   dayExtra?: Record<string, DayExtra>; // ajustes de cada dia (ênfase, tempo, cardio, exercícios a mais)
   exGroups?: Record<string, string>; // grupo muscular dos exercícios que você criou
+  agua?: Agua; // meta de água e o que você bebeu
+  alvos?: Alvos; // metas semanais de cardio e de séries por grupo muscular
   time: string; // "18:00", só para a agenda
   routines: Routine[];
   workouts: Workout[];
@@ -185,6 +199,18 @@ export interface Receivable {
   payments: { date: string; amount: number; txId?: string }[];
 }
 
+/** Uma posição de preço variável: quanto você tem, o custo médio e o preço de agora. */
+export interface Cripto {
+  id: string;
+  symbol: string; // "SOL"
+  name: string; // "Solana"
+  qty: number; // quantidade que você tem
+  avgCost: number; // custo médio por unidade (R$), como o app da corretora mostra
+  price?: number; // último preço por unidade (R$)
+  priceAt?: string; // quando o preço foi atualizado (ISO)
+  hist?: { date: string; value: number }[]; // valor da posição ao fim de cada dia atualizado
+}
+
 export interface Data {
   version: 1;
   txs: Tx[];
@@ -192,6 +218,7 @@ export interface Data {
   receivables?: Receivable[]; // quem te deve (backup antigo não tem)
   goals?: Goal[]; // metas de vida
   fit?: Fit; // treino
+  cripto?: Cripto[]; // criptomoedas e outros investimentos de preço variável
   rules: Rule[];
   config: Config;
   lastBackup: string | null;

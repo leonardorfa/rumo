@@ -6,7 +6,7 @@ import { cdiStatus, refreshCdi } from "@/lib/cdi";
 import { brl, brl0, localDay } from "@/lib/format";
 import { cdbItens, cdbNet, cdbPerDay, cdbPrincipalNow, lastCdi, usaTranches, useData, type TrancheInfo } from "@/lib/store";
 import { Bars3D, TrendChart } from "./charts";
-import { act, Button, Card, Money, Section, Segmented, Sheet, Tilt, Title, toast } from "./ui";
+import { act, Button, Card, Money, Section, Segmented, Sheet, Tilt, toast } from "./ui";
 
 const parse = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", "."));
 const dataBR = (iso: string) => iso.split("-").reverse().join("/");
@@ -48,7 +48,7 @@ export default function Cdb() {
   if (!usaTranches(d)) {
     return (
       <div>
-        <Title>CDB</Title>
+        
         <Card className="text-ink2 mt-1">
           Cadastre cada aplicação do jeito que aparece no C6: data, valor aplicado e % do CDI. O app rende cada uma com a taxa dela e calcula o IR de cada uma. Quando fizer outra aplicação, é só adicionar aqui.
         </Card>
@@ -60,7 +60,7 @@ export default function Cdb() {
 
   return (
     <div>
-      <Title>CDB</Title>
+      
 
       <Tilt><div className="hero card p-5">
         <div className="text-white/70 text-[14px]">Valor acumulado</div>
@@ -126,7 +126,7 @@ export default function Cdb() {
         <>
           <Section>Valor por aplicação</Section>
           <Card>
-            <Bars3D name="Valor" fmt={brl0} data={itens.map((i) => ({ label: dataBR(i.t.date).slice(0, 5), value: Math.round(i.value) }))} />
+            <Bars3D name="Valor" fmt={brl0} explica="Cada barra é uma aplicação (a data em que você aplicou) e a altura é quanto ela vale hoje, já com o rendimento." data={itens.map((i) => ({ label: dataBR(i.t.date).slice(0, 5), nome: i.t.name, value: Math.round(i.value) }))} />
           </Card>
         </>
       )}

@@ -9,7 +9,7 @@ import Metas from "@/components/Metas";
 import NewTx from "@/components/NewTx";
 import Pai from "@/components/Pai";
 import Treino from "@/components/Treino";
-import Cdb from "@/components/Cdb";
+import Investimentos from "@/components/Investimentos";
 import { AcoesFab } from "@/components/Voz";
 import { Card, FilePick, HideCtx, Icons, Toaster, toast } from "@/components/ui";
 import { restoreFile } from "@/lib/backup";
@@ -25,7 +25,7 @@ const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
   { id: "pai", label: "Pai", icon: Icons.pai },
   { id: "meta", label: "Metas", icon: Icons.meta },
   { id: "treino", label: "Treino", icon: Icons.treino },
-  { id: "cdb", label: "CDB", icon: Icons.cdb },
+  { id: "cdb", label: "Invest.", icon: Icons.cdb },
   { id: "mais", label: "Mais", icon: Icons.mais },
 ];
 
@@ -101,7 +101,7 @@ export default function App() {
             {tab === "pai" && <Pai month={month} setMonth={setMonth} />}
             {tab === "meta" && <Metas />}
             {tab === "treino" && <Treino />}
-            {tab === "cdb" && <Cdb />}
+            {tab === "cdb" && <Investimentos />}
             {tab === "mais" && <Mais goReview={goReview} goCdb={() => go("cdb")} />}
           </>
         )}

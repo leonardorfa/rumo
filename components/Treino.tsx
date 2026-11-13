@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { shareFile } from "@/lib/backup";
 import { localDay } from "@/lib/format";
 import {
@@ -10,6 +10,7 @@ import {
 import { update, useData } from "@/lib/store";
 import type { Cardio, Routine, Workout } from "@/lib/types";
 import { Bars3D, BarsChart, MiniTrend, TrendChart } from "./charts";
+import { AguaCard, MetasSemana, PesoLevantado } from "./Habitos";
 import { act, Button, Card, Progress, Section, Segmented, Sheet, Title, toast } from "./ui";
 
 type Aba = "hoje" | "progresso" | "plano";
@@ -134,6 +135,9 @@ function Hoje() {
         </div>
       </Card>
 
+      <MetasSemana />
+      <AguaCard />
+
       <Section>Peso</Section>
       <Card>
         {ult ? (
@@ -200,11 +204,17 @@ function TreinoSheet({ w, routineId, exercicios, onClose }: { w?: Workout; routi
   const [data, setData] = useState(w?.date ?? localDay());
   const [nota, setNota] = useState(w?.note ?? "");
   const [add, setAdd] = useState(false);
+  const chaveRascunho = `treino-rascunho-${routineId ?? ""}`;
   const [blocos, setBlocos] = useState<Bloco[]>(() => {
     if (w) {
-      const ex = [...new Set(w.sets.map((s) => s.ex))];
-      return ex.map((e) => ({ ex: e, sets: w.sets.filter((s) => s.ex === e).map((s) => ({ kg: String(s.kg).replace(".", ","), reps: String(s.reps) })) }));
+      const ex = [...new Set([...w.sets.map((s) => s.ex), ...(w.pend ?? [])])];
+      return ex.map((e) => ({ ex: e, sets: w.sets.some((s) => s.ex === e) ? w.sets.filter((s) => s.ex === e).map((s) => ({ kg: String(s.kg).replace(".", ","), reps: String(s.reps) })) : preencher(d, e) }));
     }
+    // treino começado e não salvo: volta como estava (o mesmo dia e a mesma rotina)
+    try {
+      const r = JSON.parse(localStorage.getItem(chaveRascunho) || "null") as { dia: string; blocos: Bloco[] } | null;
+      if (r && r.dia === localDay() && r.blocos?.length) return r.blocos;
+    } catch { /* sem rascunho */ }
     const exs = exercicios ?? f.routines.find((r) => r.id === (routineId ?? ""))?.exercises ?? [];
     return exs.map((e) => ({ ex: e, sets: preencher(d, e) }));
   });
@@ -218,6 +228,10 @@ function TreinoSheet({ w, routineId, exercicios, onClose }: { w?: Workout; routi
     const c = f.routines.find((r) => r.id === id)?.cardio;
     if (c) setCTipo(c.tipo);
   }
+  useEffect(() => {
+    if (w) return;
+    try { localStorage.setItem(chaveRascunho, JSON.stringify({ dia: localDay(), blocos })); } catch { /* sem storage */ }
+  }, [blocos]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (i: number, j: number, p: Partial<Bloco["sets"][number]>) =>
     setBlocos(blocos.map((b, x) => (x !== i ? b : { ...b, sets: b.sets.map((s, y) => (y === j ? { ...s, ...p } : s)) })));
   const total = blocos.reduce((a, b) => a + b.sets.filter((s) => parse(s.reps) > 0).length, 0);
@@ -225,10 +239,12 @@ function TreinoSheet({ w, routineId, exercicios, onClose }: { w?: Workout; routi
 
   function salvar() {
     const sets = blocos.flatMap((b) => b.sets.map((s) => ({ ex: b.ex, kg: parse(s.kg || "0"), reps: Math.round(parse(s.reps)) })).filter((s) => s.reps > 0 && Number.isFinite(s.kg)));
-    if (!sets.length && !temCardio) return;
+    if (!sets.length && !temCardio && !blocos.length) return;
+    try { localStorage.removeItem(chaveRascunho); } catch { /* ok */ }
+    const pend = blocos.filter((b) => !sets.some((s) => s.ex === b.ex)).map((b) => b.ex);
     const min = Math.round(parse(cMin));
     const cardio: Cardio | undefined = Number.isFinite(min) && min > 0 ? { tipo: cTipo.trim() || "Cardio", min } : undefined;
-    const novo: Workout = { id: w?.id ?? "", date: data, routineId: rotId || undefined, note: nota.trim() || undefined, cardio, sets };
+    const novo: Workout = { id: w?.id ?? "", date: data, routineId: rotId || undefined, note: nota.trim() || undefined, cardio, sets, pend };
     let recs: string[] = [];
     act(() => (recs.length ? `🏆 Recorde: ${recs.join(", ")}` : "Treino salvo"), (dd) => {
       const out = saveWorkout(dd, novo);
@@ -296,7 +312,7 @@ function TreinoSheet({ w, routineId, exercicios, onClose }: { w?: Workout; routi
       </label>
       <div className="sticky bottom-0 bg-bg pt-2 pb-1 flex gap-2">
         {w && <Button tone="danger" className="flex-1" onClick={() => { act("Treino apagado", (dd) => deleteWorkout(dd, w.id)); onClose(); }}>Apagar</Button>}
-        <Button tone="primary" className="flex-[2]" disabled={!total && !temCardio} onClick={salvar}>Salvar {total ? `· ${total} séries` : temCardio ? "· cardio" : ""}</Button>
+        <Button tone="primary" className="flex-[2]" disabled={!total && !temCardio && !blocos.length} onClick={salvar}>Salvar {total ? `· ${total} séries` : temCardio ? "· cardio" : ""}</Button>
       </div>
       {add && <EscolherExercicio onPick={(ex) => { setBlocos([...blocos, { ex, sets: preencher(d, ex) }]); setAdd(false); }} onClose={() => setAdd(false)} />}
     </Sheet>
@@ -399,6 +415,8 @@ function Progresso() {
           : <div className="text-ink2">Registre pelo menos 2 pesos para ver o gráfico.</div>}
       </Card>
 
+      <PesoLevantado />
+
       <PorTreino />
 
       <Section>Cargas</Section>
@@ -444,7 +462,7 @@ function Progresso() {
         <div className="text-[13px] text-ink2 mb-1">Treinos por semana (últimas 8)</div>
         <BarsChart name="Treinos" data={vol.map((v) => ({ label: v.label, value: v.treinos }))} color="var(--s3)" />
         <div className="text-[13px] text-ink2 mt-3 mb-1">Volume total por semana (kg)</div>
-        <Bars3D name="Volume (kg)" fmt={(v) => v.toLocaleString("pt-BR")} data={vol.map((v) => ({ label: v.label, value: v.volume }))} />
+        <Bars3D name="Volume (kg)" fmt={(v) => v.toLocaleString("pt-BR")} explica="Cada barra é uma semana (dia/mês da segunda-feira) e a altura é o peso total levantado nela: carga × repetições de todas as séries." data={vol.map((v) => ({ label: v.label, nome: `Semana de ${v.label}`, value: v.volume }))} />
       </Card>
     </>
   );

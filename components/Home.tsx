@@ -125,6 +125,13 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
               </div>
             )}
           </button>
+          {parts.cripto > 0 && (
+            <button onClick={goCdb} className="rounded-xl bg-white/10 p-3 col-span-2 text-left">
+              <div className="text-[12px] text-white/70">Cripto</div>
+              <Money v={parts.cripto} className="font-bold" />
+              <div className="text-[12px] text-white/70">valor das moedas pelo último preço anotado</div>
+            </button>
+          )}
           {parts.paiGuardado > 0 && (
             <button onClick={goPai} className="rounded-xl bg-white/10 p-3 col-span-2 text-left">
               <div className="text-[12px] text-white/70">Você deve ao seu pai</div>
@@ -145,7 +152,7 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
           )}
         </div>
         <div className="text-[12px] text-white/60 mt-3">
-          Total = disponível + CDB líquido{parts.aReceber > 0 ? " + a receber" : ""}.
+          Total = disponível + CDB líquido{parts.cripto > 0 ? " + cripto" : ""}{parts.aReceber > 0 ? " + a receber" : ""}.
         </div>
       </div></Tilt>
 
@@ -234,7 +241,7 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
           <Section action={<Segmented value={grafico} onChange={mudaGrafico} options={[{ value: "2d", label: "Barras" }, { value: "3d", label: "3D" }]} />}>Gasto por categoria</Section>
           <Card>
             {grafico === "3d"
-              ? <Bars3D name="Gasto por categoria" fmt={brl0} data={cats.map((c) => ({ label: c.icon, value: c.value }))} />
+              ? <Bars3D name="Gasto por categoria" fmt={brl0} explica="Gasto do dia a dia no mês: cada barra é uma categoria (o ícone embaixo) e a altura é quanto você gastou nela." data={cats.map((c) => ({ label: c.icon, nome: c.name, value: c.value }))} />
               : <CategoryBars data={cats} onSelect={abrirCat} />}
             <CatRows rows={tabela.slice(0, 5)} customs={customs} hidden={hidden} onOpen={setCat} />
             {tabela.length > 5 && (

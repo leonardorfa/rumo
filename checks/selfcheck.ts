@@ -784,3 +784,39 @@ console.log("cdb na projeção ok");
   assert.deepEqual(L.agrupar(["Leg press", "Supino reto"], (x) => L.grupoDe(d0, x)).map((g) => g.grupo), ["Peito", "Perna"]);
 }
 console.log("grupos musculares ok");
+
+{
+  const L = require("../lib/life") as typeof import("../lib/life");
+  const C = require("../lib/cripto") as typeof import("../lib/cripto");
+  const d0 = { txs: [], father: [], goals: [], config: DEFAULT_CONFIG, fit: undefined } as unknown as Data;
+  // água: 3 L em 3 horários = 1 L, 2 L, 3 L acumulados; nunca negativa
+  assert.deepEqual(L.aguaMarcos(d0).map((m) => [m.ate, m.ml, m.parte]), [["12:00", 1000, 1000], ["16:00", 2000, 1000], ["20:00", 3000, 1000]]);
+  let a = L.addAgua(d0, 250, "2026-11-11"); a = L.addAgua(a, 500, "2026-11-12"); a = L.addAgua(a, -9999, "2026-11-13");
+  assert.equal(L.aguaOf(a).log["2026-11-13"], 0, "não fica negativa");
+  assert.equal(L.aguaSemana(a, "2026-11-12").ml, 750, "soma a semana de segunda a domingo");
+  const ics = L.buildAguaIcs(a, new Date(2026, 10, 12));
+  assert.ok(ics.includes("SUMMARY:Tomar 1 L de água até 12:00") && ics.split("BEGIN:VEVENT").length === 4 && ics.includes("RRULE:FREQ=DAILY"));
+  // treino: série sem repetição some, mas o exercício fica no treino ao salvar (pend)
+  let t = L.saveWorkout(d0, { id: "", date: "2026-11-12", sets: [{ ex: "Supino reto", kg: 40, reps: 10 }, { ex: "Supino reto", kg: 40, reps: 8 }, { ex: "Crucifixo", kg: 10, reps: 12 }], pend: ["Tríceps corda"] });
+  const w = L.fitOf(t).workouts[0];
+  assert.deepEqual(w.pend, ["Tríceps corda"]);
+  // metas e volume
+  const f = L.feitoNaSemana(t, "2026-11-12");
+  assert.equal(f.series["Peito"], 3);
+  const pv = L.pesoLevantado(t, "2026-11-12");
+  assert.equal(pv.dia, 40 * 10 + 40 * 8 + 10 * 12);
+  assert.equal(pv.semana, pv.dia); assert.equal(pv.ano, pv.dia); assert.equal(pv.mes, pv.dia);
+  assert.equal(L.pesoLevantado(t, "2026-11-20").dia, 0);
+  assert.equal(L.alvosOf(L.setAlvos(t, { cardioMin: 90 })).cardioMin, 90);
+  // cripto: custo médio, perda e compra com média ponderada
+  let c = C.salvarCripto(d0, { id: "s", symbol: "sol", name: "Solana", qty: 0.024023172, avgCost: 1373.26 });
+  c = C.definirPreco(c, "s", 441.2, new Date(2026, 10, 12));
+  const p = C.posicao(C.criptoOf(c)[0]);
+  assert.equal(p.investido, 32.99); assert.equal(p.valor, 10.6); assert.equal(p.resultado, -22.39); assert.equal(p.pct, -67.87);
+  c = C.comprarCripto(c, "s", 1, 1000);
+  assert.ok(Math.abs(C.criptoOf(c)[0].avgCost - (0.024023172 * 1373.26 + 1000) / 1.024023172) < 1e-9, "média ponderada");
+  c = C.venderCripto(c, "s", 5);
+  assert.equal(C.criptoOf(c)[0].qty, 0, "vender mais que tem zera, não fica negativo");
+  assert.equal((require("../lib/store") as typeof import("../lib/store")).moneyParts({ ...c, config: { ...c.config, prefs: { ...c.config.prefs, countCripto: false } } }).cripto, 0, "o botão desliga cripto do total");
+}
+console.log("água, treino, metas e cripto ok");

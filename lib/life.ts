@@ -2,7 +2,7 @@
 import { localDay } from "./format";
 import { netWorthHistory } from "./insights";
 import { myMoney } from "./store";
-import type { Cardio, CdbTranche, Data, DayExtra, Fit, Goal, Routine, Workout } from "./types";
+import type { Cardio, CdbTranche, Cripto, Data, DayExtra, Fit, Goal, Routine, Workout } from "./types";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const uid = () => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
@@ -194,6 +194,7 @@ export function saveWorkout(d: Data, w: Workout): Data {
   const id = w.id || uid();
   const limpo = { ...w, id, sets: w.sets.filter((s) => s.ex && s.kg >= 0 && s.reps > 0) };
   if (!limpo.cardio || limpo.cardio.min <= 0) delete limpo.cardio;
+  if (!limpo.pend?.length) delete limpo.pend;
   return setFit(d, { workouts: (ws.some((x) => x.id === id) ? ws.map((x) => (x.id === id ? limpo : x)) : [...ws, limpo]).sort((a, b) => (a.date < b.date ? -1 : 1)) });
 }
 export const deleteWorkout = (d: Data, id: string): Data => setFit(d, { workouts: fitOf(d).workouts.filter((w) => w.id !== id) });
@@ -382,7 +383,7 @@ export function buildIcs(d: Data, now = new Date()): string {
  * de treino de um arquivo .json. Não mexe em transações nem em saldos.
  */
 export function importSetup(d: Data, json: unknown): { data: Data; metas: number; pesos: number; aplicacoes: number } {
-  const j = json as { prefs?: Partial<Data["config"]["prefs"]>; goals?: Goal[]; fit?: Partial<Fit>; clearInvoices?: boolean; cdb?: { replace?: boolean; tranches?: CdbTranche[]; pctCdi?: number } } | null;
+  const j = json as { cripto?: Cripto[]; prefs?: Partial<Data["config"]["prefs"]>; goals?: Goal[]; fit?: Partial<Fit>; clearInvoices?: boolean; cdb?: { replace?: boolean; tranches?: CdbTranche[]; pctCdi?: number } } | null;
   if (!j || typeof j !== "object") throw new Error("Arquivo inválido.");
   let out: Data = { ...d, config: { ...d.config, prefs: { ...d.config.prefs, ...(j.prefs ?? {}) } } };
   const ids = new Set((out.goals ?? []).map((g) => g.id));
@@ -429,5 +430,93 @@ export function importSetup(d: Data, json: unknown): { data: Data; metas: number
     aplicacoes = merged.length;
     out = { ...out, config: { ...out.config, cdb: { ...out.config.cdb, ...(j.cdb?.pctCdi ? { pctCdi: j.cdb.pctCdi } : {}), tranches: merged, moves: [] } } };
   }
+  // moedas: soma por id, sem apagar o preço que você já atualizou
+  const moedas = (j.cripto ?? []).filter((c) => c?.id && c.symbol && c.qty > 0 && c.avgCost > 0);
+  if (moedas.length) {
+    const atuais = out.cripto ?? [];
+    out = { ...out, cripto: [...atuais, ...moedas.filter((m) => !atuais.some((a) => a.id === m.id))] };
+  }
   return { data: out, metas: novas.length, pesos: pesos.length, aplicacoes };
+}
+
+// ---------- água, metas semanais e volume ----------
+
+export const AGUA_PADRAO = { metaMl: 3000, horarios: ["12:00", "16:00", "20:00"], copoMl: 250 };
+export const aguaOf = (d: Data) => ({ ...AGUA_PADRAO, log: {} as Record<string, number>, ...fitOf(d).agua });
+export const setAgua = (d: Data, patch: Partial<NonNullable<Fit["agua"]>>): Data => setFit(d, { agua: { ...aguaOf(d), ...patch } });
+/** Soma (ou tira, com ml negativo) água de um dia. Nunca fica abaixo de zero. */
+export function addAgua(d: Data, ml: number, dia = localDay()): Data {
+  const a = aguaOf(d);
+  return setAgua(d, { log: { ...a.log, [dia]: Math.max(0, (a.log[dia] ?? 0) + ml) } });
+}
+/** Os pontos do dia: "1 L até 12:00", "2 L até 16:00"... (acumulado). */
+export function aguaMarcos(d: Data) {
+  const a = aguaOf(d);
+  const hs = [...a.horarios].sort();
+  return hs.map((h, i) => ({ ate: h, ml: Math.round((a.metaMl * (i + 1)) / hs.length), parte: Math.round(a.metaMl / hs.length) }));
+}
+export function aguaSemana(d: Data, hoje = localDay()) {
+  const a = aguaOf(d);
+  const dias = weekDates(hoje);
+  return { ml: dias.reduce((s, x) => s + (a.log[x] ?? 0), 0), meta: a.metaMl * 7 };
+}
+const litros = (ml: number) => `${(ml / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} L`;
+export const fmtAgua = litros;
+
+/** Lembretes diários de água para o calendário do iPhone: um alerta antes de cada horário. */
+export function buildAguaIcs(d: Data, now = new Date()): string {
+  const hoje = localDay(now);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ev = aguaMarcos(d).map((m, i) => {
+    const [hh, mm] = m.ate.split(":").map(Number);
+    const ini = hh * 60 + mm - 30;
+    const ini0 = ((ini % 1440) + 1440) % 1440;
+    const texto = `Tomar ${litros(m.parte)} de água até ${m.ate}`;
+    return [
+      "BEGIN:VEVENT",
+      `UID:agua-${i}-${m.ate.replace(":", "")}@orbita.app`,
+      `DTSTAMP:${hoje.replace(/-/g, "")}T000000Z`,
+      `DTSTART:${hoje.replace(/-/g, "")}T${pad(Math.floor(ini0 / 60))}${pad(ini0 % 60)}00`,
+      `DTEND:${hoje.replace(/-/g, "")}T${pad(hh)}${pad(mm)}00`,
+      "RRULE:FREQ=DAILY",
+      `SUMMARY:${texto}`,
+      "BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${texto}`, "TRIGGER:PT0M", "END:VALARM",
+      "END:VEVENT",
+    ].join("\r\n");
+  });
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Orbita//Agua//PT", "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR"].join("\r\n");
+}
+
+/**
+ * Metas semanais. Padrões vêm da literatura e você muda tudo:
+ * - cardio 150 min/semana: mínimo de atividade moderada da OMS (2020) para adultos;
+ * - séries por grupo: a meta-análise de Schoenfeld, Ogborn e Krieger (2017) viu mais ganho de massa com 10 ou mais séries
+ *   por semana por músculo, e Pelland et al. (2024, preprint) mostram retorno que cresce com o volume, cada vez menor.
+ *   Bíceps e tríceps já trabalham nos exercícios de costas e peito, então precisam de menos séries diretas.
+ */
+export const ALVOS_PADRAO = { cardioMin: 150, series: { Peito: 12, Costas: 12, Ombro: 12, Bíceps: 10, Tríceps: 8, Perna: 12, Abdômen: 6 } as Record<string, number> };
+export const alvosOf = (d: Data) => ({ ...ALVOS_PADRAO, ...fitOf(d).alvos, series: { ...ALVOS_PADRAO.series, ...(fitOf(d).alvos?.series ?? {}) } });
+export const setAlvos = (d: Data, patch: Partial<NonNullable<Fit["alvos"]>>): Data => setFit(d, { alvos: { ...alvosOf(d), ...patch } });
+
+/** O que você já fez na semana (segunda a domingo): minutos de cardio e séries por grupo. */
+export function feitoNaSemana(d: Data, hoje = localDay()) {
+  const dias = weekDates(hoje);
+  const ws = fitOf(d).workouts.filter((w) => w.date >= dias[0] && w.date <= dias[6]);
+  const series: Record<string, number> = {};
+  for (const w of ws) for (const s of w.sets) series[grupoDe(d, s.ex)] = (series[grupoDe(d, s.ex)] ?? 0) + 1;
+  return { cardio: ws.reduce((a, w) => a + (w.cardio?.min ?? 0), 0), series };
+}
+
+/** Peso total levantado (kg × repetições): hoje, semana, mês, ano e desde sempre. Só curiosidade. */
+export function pesoLevantado(d: Data, hoje = localDay()) {
+  const dias = weekDates(hoje);
+  const vol = (w: Workout) => w.sets.reduce((a, s) => a + s.kg * s.reps, 0);
+  const soma = (f: (w: Workout) => boolean) => Math.round(fitOf(d).workouts.filter(f).reduce((a, w) => a + vol(w), 0));
+  return {
+    dia: soma((w) => w.date === hoje),
+    semana: soma((w) => w.date >= dias[0] && w.date <= dias[6]),
+    mes: soma((w) => w.date.slice(0, 7) === hoje.slice(0, 7)),
+    ano: soma((w) => w.date.slice(0, 4) === hoje.slice(0, 4)),
+    total: soma(() => true),
+  };
 }

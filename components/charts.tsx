@@ -244,15 +244,26 @@ export function MiniTrend({ data, unit }: { data: { label: string; value: number
 }
 
 /** Colunas em 3D (CSS puro): crescem ao aparecer. `fmt` formata o valor escrito embaixo de cada coluna. */
-export function Bars3D({ data, name, fmt, color }: { data: { label: string; value: number; color?: string }[]; name: string; fmt?: (v: number) => string; color?: string }) {
+export function Bars3D({ data, name, fmt, color, explica }: { data: { label: string; nome?: string; value: number; color?: string }[]; name: string; fmt?: (v: number) => string; color?: string; explica?: string }) {
   const hidden = useContext(HideCtx);
+  const [sel, setSel] = useState<number | null>(null);
   const anim = useAnim();
   const [cresceu, setCresceu] = useState(!anim);
   useEffect(() => { const t = setTimeout(() => setCresceu(true), 80); return () => clearTimeout(t); }, []);
   if (!data.length) return null;
   const max = Math.max(1, ...data.map((d) => d.value));
-  const H = 140, D = 16, W = Math.max(18, Math.min(34, Math.floor(250 / data.length)));
+  const H = 140, D = 16, W = Math.max(14, Math.min(34, Math.floor(250 / data.length)));
+  const f = (v: number) => (fmt ? fmt(v) : v.toLocaleString("pt-BR"));
+  const escolhida = sel !== null ? data[sel] : null;
   return (
+    <div>
+    <div className="text-[13px] text-ink2 mb-1">{explica ?? `${name}. A altura de cada barra é o valor; toque numa barra para ver o nome e o número.`}</div>
+    <div className="relative">
+    {/* régua: o topo é o maior valor, a linha do meio é a metade */}
+    <div className="absolute left-0 right-0 pointer-events-none text-[10px] text-ink3" style={{ top: 16, height: H }} aria-hidden>
+      <div className="absolute left-0 right-0 border-t border-dashed border-line"><span className="bg-card pr-1">{hidden ? "" : f(max)}</span></div>
+      <div className="absolute left-0 right-0 border-t border-dashed border-line" style={{ top: "50%" }}><span className="bg-card pr-1">{hidden ? "" : f(max / 2)}</span></div>
+    </div>
     <div className="w-full overflow-hidden" style={{ perspective: 1000 }} role="img" aria-label={`Gráfico 3D de ${name}`}>
       <div className="flex items-end justify-around gap-1 pt-4 pb-1" style={{ transform: "rotateX(-16deg) rotateY(-22deg) scale(.94)", transformStyle: "preserve-3d" }}>
         {data.map((d, i) => {
@@ -260,7 +271,7 @@ export function Bars3D({ data, name, fmt, color }: { data: { label: string; valu
           const cor = d.color ?? color ?? SERIES[i % SERIES.length];
           const base: React.CSSProperties = { position: "absolute", backfaceVisibility: "hidden", transition: anim ? `all .9s cubic-bezier(.2,.8,.2,1) ${i * 60}ms` : undefined };
           return (
-            <div key={d.label + i} className="flex flex-col items-center min-w-0" style={{ width: W + D, transformStyle: "preserve-3d" }}>
+            <div key={d.label + i} onClick={() => setSel(sel === i ? null : i)} className="flex flex-col items-center min-w-0 cursor-pointer" style={{ width: W + D, transformStyle: "preserve-3d", opacity: sel === null || sel === i ? 1 : 0.45 }}>
               <div style={{ height: H + 4, display: "flex", alignItems: "flex-end", transformStyle: "preserve-3d" }}>
                 <div style={{ position: "relative", width: W, height: h, transformStyle: "preserve-3d", transition: anim ? `height .9s cubic-bezier(.2,.8,.2,1) ${i * 60}ms` : undefined }}>
                   <div style={{ ...base, left: 0, top: 0, width: W, height: h, background: cor, transform: `translateZ(${D / 2}px)` }} />
@@ -269,11 +280,16 @@ export function Bars3D({ data, name, fmt, color }: { data: { label: string; valu
                 </div>
               </div>
               <span className="text-[10px] text-ink3 mt-1.5 truncate max-w-full">{d.label}</span>
-              {!hidden && <span className="text-[10px] text-ink2 truncate max-w-full">{fmt ? fmt(d.value) : d.value.toLocaleString("pt-BR")}</span>}
+              {!hidden && <span className="text-[10px] text-ink2 truncate max-w-full">{f(d.value)}</span>}
             </div>
           );
         })}
       </div>
+    </div>
+    </div>
+    <div className="text-[14px] mt-1 min-h-[20px]" aria-live="polite">
+      {escolhida && <><b>{escolhida.nome ?? escolhida.label}</b>: {hidden ? "••••" : f(escolhida.value)}</>}
+    </div>
     </div>
   );
 }
