@@ -840,3 +840,47 @@ console.log("água, treino, metas e cripto ok");
   assert.equal(C.noLucroAlvo(sobe).length, 1);
 }
 console.log("histórico e alvos de cripto ok");
+
+// ---- regressões: cada bug que já apareceu e não pode voltar (ver AGENTS.md) ----
+{
+  const fs = require("fs") as typeof import("fs");
+  const L = require("../lib/life") as typeof import("../lib/life");
+  const P = require("../lib/projections") as typeof import("../lib/projections");
+  const src = (f: string) => fs.readFileSync(f, "utf8");
+  const d0 = { txs: [], father: [], goals: [], config: DEFAULT_CONFIG, fit: undefined } as unknown as Data;
+
+  // 2026-11-14: janela da senha aparecia no meio da página e escurecia só o cartão (ficava presa ao cartão animado no iPhone)
+  assert.ok(/createPortal\(/.test(src("components/ui.tsx")) && /document\.body/.test(src("components/ui.tsx")), "Sheet precisa ir para o <body> (portal)");
+
+  // 2026-11-14: fonte sem o prefixo do endereço (/rumo) deixava a fonte padrão no GitHub Pages
+  assert.ok(!/url\(["']?\/[a-z]/i.test(src("app/globals.css")), "CSS não pode ter url() absoluta: quebra com prefixo de endereço");
+  assert.ok(/\$\{base\}\/fonts\/pjs\.woff2/.test(src("app/layout.tsx")), "a fonte precisa usar o prefixo do endereço");
+
+  // 2026-11-14: .ics sem quebra de linha no fim e sem METHOD não era importado pelo iPhone
+  for (const ics of [L.buildAguaIcs(d0, new Date(2026, 10, 14)), L.buildIcs({ ...d0, fit: { weights: [], days: { "1": "" }, time: "18:00", routines: [], workouts: [] } }, new Date(2026, 10, 14))]) {
+    assert.ok(ics.endsWith("END:VCALENDAR\r\n"), ".ics termina com CRLF");
+    assert.ok(ics.includes("METHOD:PUBLISH"), ".ics com METHOD:PUBLISH");
+  }
+
+  // 2026-11-14: leitura de PDF podia ficar esperando para sempre no iPhone
+  const pdf = src("lib/pdf.ts");
+  assert.ok(/Promise\.race\(\[lerPdf/.test(pdf) && /LeituraDemorou/.test(pdf), "pdfToText precisa ter limite de tempo geral");
+  assert.ok(/pdfjsWorker/.test(pdf), "leitura sem Web Worker");
+  assert.ok(/etapaPdf/.test(src("components/Mais.tsx")), "o aviso de erro mostra a etapa em que parou");
+
+  // 2026-11-14: janelas ficavam abertas/escuras depois de voltar do seletor de arquivos (timers pausados pelo iOS)
+  assert.ok(/visibilitychange/.test(src("components/ui.tsx")), "Sheet limpa o que sobrou ao voltar do seletor de arquivos");
+
+  // 2026-11-11: texto preto nos gráficos do modo escuro (tooltip do Recharts usa #000 sem itemStyle)
+  assert.ok(/itemStyle:\s*\{\s*color:\s*"var\(--ink\)"/.test(src("components/charts.tsx")), "tooltip dos gráficos usa a cor do tema");
+
+  // 2026-11-13: a barra de limite do mês precisa mudar com o cenário escolhido
+  const sc = P.computeScenarios({ effectiveBalance: 10000, salary: 3000, fixedCosts: 1000, remainingMonths: 4, specialExpenses: [], goalAmount: 12000, startYear: 2026, startMonth: 9, skipFirstMonthSalary: false, recentAvg: 700, economyPct: 30 });
+  assert.equal(new Set(sc.map((s) => s.monthlyVariable)).size, 3, "teto, ritmo e econômico têm limites diferentes");
+  assert.ok(/cenario-meta/.test(src("components/Metas.tsx")) && /cenario-meta/.test(src("components/Home.tsx")), "Metas e Início leem o mesmo cenário escolhido");
+
+  // 2026-11-12: treino salvo perdia os exercícios ainda sem série
+  const t = L.saveWorkout(d0, { id: "", date: "2026-11-12", sets: [{ ex: "Supino reto", kg: 40, reps: 10 }], pend: ["Tríceps corda", "Crucifixo"] });
+  assert.deepEqual(L.fitOf(t).workouts[0].pend, ["Tríceps corda", "Crucifixo"]);
+}
+console.log("regressões ok");

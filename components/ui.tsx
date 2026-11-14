@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { brl, brlSigned, monthName, shiftMonth } from "@/lib/format";
 import { animOn, useAnim } from "@/lib/anim";
 import { getData, setData, update } from "@/lib/store";
@@ -149,7 +150,7 @@ export function Sheet({ open, onClose, title, children }: {
   // Saída animada: com `open` virando falso a janela fica um instante a mais, encolhendo.
   // Quando quem usa tira a janela da tela de uma vez (`{x && <Sheet/>}`), a saída vem de uma cópia
   // que fica por cima só enquanto encolhe.
-  const raiz = useRef<HTMLDivElement>(null);
+  const raiz = useRef<HTMLDivElement | null>(null);
   const [mostrando, setMostrando] = useState(open);
   const [saindo, setSaindo] = useState(false);
   useEffect(() => {
@@ -200,9 +201,10 @@ export function Sheet({ open, onClose, title, children }: {
       v?.removeEventListener("scroll", sync);
     };
   }, [open, onClose]);
-  if (!open && !mostrando) return null;
-  return (
-    <div ref={raiz} className={`fixed left-0 right-0 z-50 flex items-end justify-center ${saindo ? "sheet-leaving" : ""}`} role="dialog" aria-modal aria-label={title}
+  if ((!open && !mostrando) || typeof document === "undefined") return null;
+  // Vai para o <body>: dentro de um cartão com animação, o iPhone prendia a janela (fixa) ao cartão e ela aparecia no meio da página.
+  return createPortal(
+    <div ref={(n) => { if (n) raiz.current = n; }} className={`fixed left-0 right-0 z-50 flex items-end justify-center ${saindo ? "sheet-leaving" : ""}`} role="dialog" aria-modal aria-label={title}
       style={vv ? { top: vv.top, height: vv.h } : { top: 0, bottom: 0 }}
       onFocusCapture={(e) => {
         const el = e.target as HTMLElement;
@@ -218,7 +220,8 @@ export function Sheet({ open, onClose, title, children }: {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
