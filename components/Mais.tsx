@@ -155,7 +155,7 @@ export default function Mais({ goReview, goCdb }: { goReview: () => void; goCdb:
       <Card>
         <div className="flex items-center justify-between gap-3">
           <span>
-            <span className="block">Versão de {process.env.NEXT_PUBLIC_BUILD}</span>
+            <span className="block">Versão {process.env.NEXT_PUBLIC_VERSION} · de {process.env.NEXT_PUBLIC_BUILD}</span>
             <span className="block text-[13px] text-ink3">Se algo novo não apareceu, toque em atualizar.</span>
           </span>
           <Button className="shrink-0" onClick={atualizarApp}>Atualizar</Button>

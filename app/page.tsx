@@ -88,6 +88,7 @@ export default function App() {
 
   return (
     <HideCtx.Provider value={hidden}>
+      <span className="fixed top-0.5 right-1.5 z-40 text-[10px] text-ink3 opacity-60 pointer-events-none select-none" aria-hidden>v{process.env.NEXT_PUBLIC_VERSION}</span>
       <main className="mx-auto max-w-[480px] px-4 pb-tab" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         {empty && tab === "home" ? (
           <Welcome onStart={() => go("mais")} />

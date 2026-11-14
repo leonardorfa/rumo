@@ -160,6 +160,17 @@ export function Sheet({ open, onClose, title, children }: {
     const t = setTimeout(() => { setMostrando(false); setSaindo(false); }, 240);
     return () => clearTimeout(t);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  // iOS pausa os temporizadores quando o seletor de arquivos ou outro app abre: ao voltar, fecha de vez o que já devia ter fechado
+  useEffect(() => {
+    const volta = () => {
+      if (document.visibilityState === "hidden" || open) return;
+      setMostrando(false); setSaindo(false);
+      document.querySelectorAll(".sheet-ghost").forEach((e) => e.remove());
+    };
+    document.addEventListener("visibilitychange", volta);
+    window.addEventListener("pageshow", volta);
+    return () => { document.removeEventListener("visibilitychange", volta); window.removeEventListener("pageshow", volta); };
+  }, [open]);
   useLayoutEffect(() => () => {
     const el = raiz.current;
     if (!el || !animOn()) return;
@@ -168,6 +179,7 @@ export function Sheet({ open, onClose, title, children }: {
     copia.style.pointerEvents = "none";
     copia.removeAttribute("role");
     document.body.appendChild(copia);
+    copia.addEventListener("animationend", () => copia.remove(), true);
     setTimeout(() => copia.remove(), 300);
   }, []);
   // O teclado do iPhone não encolhe a página: a folha ficava por trás dele e escondia o campo.
