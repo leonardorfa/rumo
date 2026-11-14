@@ -820,3 +820,23 @@ console.log("grupos musculares ok");
   assert.equal((require("../lib/store") as typeof import("../lib/store")).moneyParts({ ...c, config: { ...c.config, prefs: { ...c.config.prefs, countCripto: false } } }).cripto, 0, "o botão desliga cripto do total");
 }
 console.log("água, treino, metas e cripto ok");
+
+{
+  const C = require("../lib/cripto") as typeof import("../lib/cripto");
+  const d0 = { txs: [], father: [], goals: [], config: DEFAULT_CONFIG } as unknown as Data;
+  let c = C.salvarCripto(d0, { id: "x", symbol: "abc", name: "Abc", qty: 2, avgCost: 100, price: 100, desde: "2026-01-10", alvo: { lucroPct: 20, perdaPct: 50 } });
+  const antes = c;
+  c = C.comprarCripto(c, "x", 1, 150, "2026-06-01"); // 3 moedas por 350 no total
+  c = C.definirPreco(c, "x", 130, new Date(2026, 10, 12));
+  const h = C.historicoDe(C.criptoOf(c)[0]);
+  assert.equal(h.length, 2);
+  assert.deepEqual([h[0].qty, h[0].pago, h[0].valor, h[0].pct], [2, 200, 260, 30], "posição inicial: pôs 200, vale 260");
+  assert.deepEqual([h[1].qty, h[1].pago, h[1].valor, h[1].pct], [1, 150, 130, -13.33], "compra: pôs 150, vale 130");
+  // meta de lucro: avisa só ao atravessar, não a cada atualização
+  const sobe = C.definirPreco(antes, "x", 125);
+  assert.equal(C.alvosAtingidos(antes, sobe).map((a) => a.tipo).join(), "lucro");
+  assert.equal(C.alvosAtingidos(sobe, C.definirPreco(sobe, "x", 130)).length, 0, "já estava acima: não repete");
+  assert.equal(C.alvosAtingidos(antes, C.definirPreco(antes, "x", 40)).map((a) => a.tipo).join(), "perda");
+  assert.equal(C.noLucroAlvo(sobe).length, 1);
+}
+console.log("histórico e alvos de cripto ok");

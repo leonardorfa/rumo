@@ -32,10 +32,42 @@ export function salvarCripto(d: Data, c: Omit<Cripto, "id"> & { id?: string }): 
 }
 export const apagarCripto = (d: Data, id: string): Data => ({ ...d, cripto: criptoOf(d).filter((c) => c.id !== id) });
 
-/** Comprou mais: soma a quantidade e refaz o custo médio (média ponderada pelo que pagou). */
-export function comprarCripto(d: Data, id: string, qty: number, pagoReais: number): Data {
-  return { ...d, cripto: criptoOf(d).map((c) => (c.id !== id || qty <= 0 ? c : { ...c, qty: c.qty + qty, avgCost: (c.qty * c.avgCost + pagoReais) / (c.qty + qty) })) };
+/** Comprou mais: soma a quantidade, refaz o custo médio (média ponderada pelo que pagou) e guarda a compra no histórico. */
+export function comprarCripto(d: Data, id: string, qty: number, pagoReais: number, date = localDay()): Data {
+  return { ...d, cripto: criptoOf(d).map((c) => (c.id !== id || qty <= 0 ? c : { ...c, qty: c.qty + qty, avgCost: (c.qty * c.avgCost + pagoReais) / (c.qty + qty), compras: [...(c.compras ?? []), { id: uid(), date, qty, pago: r2(pagoReais) }] })) };
 }
+
+/** Cada entrada (posição inicial e compras) com quanto vale hoje e quanto valorizou ou desvalorizou. */
+export function historicoDe(c: Cripto) {
+  const compras = c.compras ?? [];
+  const qtdInicial = c.qty - compras.reduce((s, x) => s + x.qty, 0);
+  // o custo da posição inicial é o que sobra do total pago depois de tirar as compras
+  const pagoInicial = Math.max(0, c.avgCost * c.qty - compras.reduce((s, x) => s + x.pago, 0));
+  const linhas = [
+    ...(qtdInicial > 1e-12 ? [{ id: "ini", date: c.desde ?? "", qty: qtdInicial, pago: r2(pagoInicial) }] : []),
+    ...compras,
+  ];
+  const p = precoDe(c);
+  return linhas.map((l) => {
+    const valor = r2(l.qty * p);
+    return { ...l, valor, resultado: r2(valor - l.pago), pct: l.pago > 0 ? Math.round(((valor - l.pago) / l.pago) * 10000) / 100 : 0 };
+  });
+}
+
+/** Moedas cujo resultado atravessou a meta de lucro (ou de perda) entre dois estados dos dados. */
+export function alvosAtingidos(antes: Data, depois: Data): { id: string; symbol: string; tipo: "lucro" | "perda"; pct: number }[] {
+  const out: { id: string; symbol: string; tipo: "lucro" | "perda"; pct: number }[] = [];
+  for (const c of criptoOf(depois)) {
+    const a = criptoOf(antes).find((x) => x.id === c.id);
+    if (!a || !c.alvo) continue;
+    const pa = posicao(a).pct, pd = posicao(c).pct;
+    if (c.alvo.lucroPct && pa < c.alvo.lucroPct && pd >= c.alvo.lucroPct) out.push({ id: c.id, symbol: c.symbol, tipo: "lucro", pct: pd });
+    if (c.alvo.perdaPct && pa > -c.alvo.perdaPct && pd <= -c.alvo.perdaPct) out.push({ id: c.id, symbol: c.symbol, tipo: "perda", pct: pd });
+  }
+  return out;
+}
+/** Moedas que estão agora acima da meta de lucro (para o aviso fixo no Início). */
+export const noLucroAlvo = (d: Data) => criptoOf(d).filter((c) => c.alvo?.lucroPct && posicao(c).pct >= c.alvo.lucroPct);
 /** Vendeu parte: o custo médio não muda, só a quantidade. */
 export function venderCripto(d: Data, id: string, qty: number): Data {
   return { ...d, cripto: criptoOf(d).map((c) => (c.id !== id ? c : { ...c, qty: Math.max(0, c.qty - qty) })) };

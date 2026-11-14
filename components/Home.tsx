@@ -11,6 +11,7 @@ import { saveBackup } from "@/lib/backup";
 import { billActive, cdbNet, changesSinceBackup, fatherPending, moneyParts, cdbPerDay, dismissRecurring, fatherBalance, monthKey, myMoney, parcela, projectionInput, toggleBillPaid, update, useData } from "@/lib/store";
 import type { Data, Tx } from "@/lib/types";
 import { Bars3D, CategoryBars, CategoryDonut, CumulativeChart, type CatDatum } from "./charts";
+import { noLucroAlvo, posicao } from "@/lib/cripto";
 import { TxList, TxRow, TxSheet } from "./Tx";
 import Revisar from "./Revisar";
 import { ReceberCard } from "./Receber";
@@ -216,6 +217,17 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
       )}
 
       <ReceberCard />
+
+      {noLucroAlvo(d).length > 0 && (
+        <Card className="mt-3 flex items-center gap-3" onClick={goCdb}>
+          <span className="w-10 h-10 rounded-full bg-fill grid place-items-center text-lg" aria-hidden>🎯</span>
+          <span className="flex-1">
+            <span className="block font-semibold">Meta de lucro batida</span>
+            <span className="block text-[13px] text-ink3">{noLucroAlvo(d).map((c) => `${c.symbol} ${posicao(c).pct.toLocaleString("pt-BR")}%`).join(" · ")}</span>
+          </span>
+          <span className="text-ink3 text-xl" aria-hidden>›</span>
+        </Card>
+      )}
 
       {alertas.length > 0 && (
         <Card className="mt-3" onClick={goMeta}>

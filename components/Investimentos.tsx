@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { brl, brl0 } from "@/lib/format";
-import { apagarCripto, buscarPrecos, comprarCripto, criptoOf, definirPreco, posicao, salvarCripto, totais, venderCripto } from "@/lib/cripto";
+import { brl, brl0, localDay } from "@/lib/format";
+import { alvosAtingidos, apagarCripto, buscarPrecos, comprarCripto, criptoOf, definirPreco, historicoDe, posicao, salvarCripto, totais, venderCripto } from "@/lib/cripto";
+import { getData } from "@/lib/store";
 import { update, useData } from "@/lib/store";
 import type { Cripto } from "@/lib/types";
 import Cdb from "./Cdb";
@@ -14,6 +15,17 @@ const ptNum = (n: number, max = 8) => n.toLocaleString("pt-BR", { maximumFractio
 const sinal = (v: number) => (v > 0 ? "+" : "");
 
 type Aba = "renda" | "cripto";
+
+/** Aviso na tela e, se você liberou, também como notificação (só funciona com o app aberto). */
+function avisar(msg: string) {
+  toast(msg);
+  try {
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      navigator.serviceWorker?.ready.then((r) => r.showNotification("Órbita", { body: msg })).catch(() => new Notification("Órbita", { body: msg }));
+    }
+  } catch { /* o aviso na tela já saiu */ }
+}
+const dataBR = (iso: string) => (iso ? iso.split("-").reverse().join("/") : "data não informada");
 
 export default function Investimentos() {
   const [aba, setAba] = useState<Aba>(() => { try { return (localStorage.getItem("aba-invest") as Aba) || "renda"; } catch { return "renda"; } });
@@ -45,7 +57,9 @@ function CriptoTab() {
     setBuscando(false);
     const n = Object.keys(p).length;
     if (!n) { if (!silencioso) toast("Não consegui as cotações agora. Você pode digitar o preço em cada moeda."); return; }
+    const antes = getData();
     update((dd) => criptoOf(dd).reduce((acc, c) => (p[c.symbol] ? definirPreco(acc, c.id, p[c.symbol]) : acc), dd));
+    for (const a of alvosAtingidos(antes, getData())) avisar(a.tipo === "lucro" ? `${a.symbol} bateu a meta de lucro: ${a.pct.toLocaleString("pt-BR")}%` : `${a.symbol} passou do limite de perda: ${a.pct.toLocaleString("pt-BR")}%`);
     if (!silencioso) toast(`${n} cotaç${n === 1 ? "ão atualizada" : "ões atualizadas"}`);
   }
   // ao abrir a aba, atualiza sozinho (se ligado em Mais e se os preços têm mais de 5 min)
@@ -54,6 +68,12 @@ function CriptoTab() {
     if (ultima && Date.now() - Date.parse(ultima) < 5 * 60 * 1000) return;
     atualizar(true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // "em tempo real": com a aba aberta, confere os preços a cada minuto
+  useEffect(() => {
+    if (!lista.length || d.config.prefs.autoCotacao === false) return;
+    const t = setInterval(() => { if (!document.hidden) atualizar(true); }, 60000);
+    return () => clearInterval(t);
+  }, [lista.length, d.config.prefs.autoCotacao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!lista.length) {
     return (
@@ -80,9 +100,12 @@ function CriptoTab() {
           </div>
         </div>
         <Button tone="primary" className="w-full mt-3" onClick={() => atualizar()} disabled={buscando}>{buscando ? "Buscando…" : "Atualizar cotações"}</Button>
+        {typeof Notification !== "undefined" && Notification.permission === "default" && (
+          <button className="text-link text-[14px] font-semibold mt-2" onClick={() => Notification.requestPermission().then(() => toast("Avisos liberados neste aparelho"))}>Liberar avisos do aparelho para as metas de lucro</button>
+        )}
         <div className="text-[12px] text-ink3 mt-2">
           {ultima ? `Preços de ${new Date(ultima).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}. ` : "Sem preço ainda: o app usa o custo médio até você atualizar. "}
-          Ao abrir esta aba o app consulta a Coinbase e só envia o símbolo da moeda (SOL, BTC…). Dá para desligar em Mais, ou digitar o preço em cada moeda.
+          Com esta aba aberta o app consulta a cada minuto. Ao abrir, ele consulta a Coinbase e só envia o símbolo da moeda (SOL, BTC…). Dá para desligar em Mais, ou digitar o preço em cada moeda.
         </div>
       </Card>
 
@@ -146,6 +169,9 @@ function CriptoForm({ c, onClose }: { c: Cripto | null; onClose: () => void }) {
   const [qtd, setQtd] = useState(c ? String(c.qty).replace(".", ",") : "");
   const [custo, setCusto] = useState(c ? String(c.avgCost).replace(".", ",") : "");
   const [preco, setPreco] = useState(c?.price ? String(c.price).replace(".", ",") : "");
+  const [desde, setDesde] = useState(c?.desde ?? (c ? "" : localDay()));
+  const [lucro, setLucro] = useState(c?.alvo?.lucroPct ? String(c.alvo.lucroPct).replace(".", ",") : "");
+  const [perda, setPerda] = useState(c?.alvo?.perdaPct ? String(c.alvo.perdaPct).replace(".", ",") : "");
   const q = parse(qtd), m = parse(custo), p = preco ? parse(preco) : undefined;
   const ok = simbolo.trim() && q > 0 && m > 0 && (p === undefined || p > 0);
   return (
@@ -160,13 +186,23 @@ function CriptoForm({ c, onClose }: { c: Cripto | null; onClose: () => void }) {
         <input inputMode="decimal" className="num" value={qtd} onChange={(e) => setQtd(e.target.value)} placeholder="0,024023172" /></label>
       <label className="block mb-3"><span className="block text-[13px] text-ink3 px-1 mb-1">Custo médio por unidade (R$)</span>
         <input inputMode="decimal" className="num" value={custo} onChange={(e) => setCusto(e.target.value)} placeholder="1.373,26" /></label>
-      <label className="block mb-4"><span className="block text-[13px] text-ink3 px-1 mb-1">Preço de agora por unidade (R$, opcional)</span>
+      <label className="block mb-3"><span className="block text-[13px] text-ink3 px-1 mb-1">Preço de agora por unidade (R$, opcional)</span>
         <input inputMode="decimal" className="num" value={preco} onChange={(e) => setPreco(e.target.value)} placeholder="441,20" /></label>
+      <label className="block mb-3"><span className="block text-[13px] text-ink3 px-1 mb-1">Quando você pôs</span>
+        <input type="date" value={desde} max={localDay()} onChange={(e) => setDesde(e.target.value)} /></label>
+      <div className="text-[13px] text-ink3 px-1 mb-1">Avisar quando o resultado chegar em (opcional)</div>
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <label className="block min-w-0"><span className="block text-[12px] text-ink3 px-1 mb-1">Lucro de (%)</span>
+          <input inputMode="decimal" className="num" value={lucro} onChange={(e) => setLucro(e.target.value)} placeholder="20" /></label>
+        <label className="block min-w-0"><span className="block text-[12px] text-ink3 px-1 mb-1">Perda de (%)</span>
+          <input inputMode="decimal" className="num" value={perda} onChange={(e) => setPerda(e.target.value)} placeholder="70" /></label>
+      </div>
       <div className="flex gap-2">
         {c && <Button tone="danger" className="flex-1" onClick={() => { act("Moeda apagada", (dd) => apagarCripto(dd, c.id)); onClose(); }}>Apagar</Button>}
         <Button tone="primary" className="flex-[2]" disabled={!ok} onClick={() => {
           act("Moeda salva", (dd) => {
-            const out = salvarCripto(dd, { id: c?.id, symbol: simbolo, name: nome, qty: q, avgCost: m, price: c?.price, priceAt: c?.priceAt, hist: c?.hist });
+            const out = salvarCripto(dd, { id: c?.id, symbol: simbolo, name: nome, qty: q, avgCost: m, price: c?.price, priceAt: c?.priceAt, hist: c?.hist, compras: c?.compras, desde: desde || undefined,
+              alvo: { lucroPct: parse(lucro) > 0 ? parse(lucro) : undefined, perdaPct: parse(perda) > 0 ? parse(perda) : undefined } });
             const id = c?.id ?? criptoOf(out).find((x) => !criptoOf(dd).some((y) => y.id === x.id))?.id;
             return p !== undefined && id ? definirPreco(out, id, p) : out;
           });
@@ -197,6 +233,27 @@ function CriptoDetalhe({ c, onClose, onEditar }: { c: Cripto; onClose: () => voi
         </div>
         <div className="text-[12px] text-ink3 mt-1">{ptNum(c.qty)} {c.symbol} × custo médio {brl(c.avgCost)}</div>
         {hist.length >= 2 && <div className="mt-2"><TrendChart name={`Valor de ${c.symbol}`} fmt={brl0} data={hist} /></div>}
+      </div>
+
+      <div className="text-[13px] text-ink3 px-1 mb-1">Histórico: quando pôs e quanto valorizou</div>
+      <div className="card px-4 mb-3">
+        {historicoDe(c).map((l, i) => (
+          <div key={l.id} className={`py-2.5 ${i ? "border-t border-line" : ""}`}>
+            <div className="flex justify-between text-[14px]">
+              <span>{l.id === "ini" ? "Posição inicial" : "Compra"} · {dataBR(l.date)}</span>
+              <span className={l.resultado < 0 ? "text-alert font-semibold" : "text-ok font-semibold"}>{sinal(l.pct)}{ptNum(l.pct, 2)}%</span>
+            </div>
+            <div className="flex justify-between text-[12px] text-ink3">
+              <span>{ptNum(l.qty)} {c.symbol} por <Money v={l.pago} /></span>
+              <span>vale <Money v={l.valor} /> ({sinal(l.resultado)}<Money v={Math.abs(l.resultado)} />)</span>
+            </div>
+          </div>
+        ))}
+        {c.alvo && (c.alvo.lucroPct || c.alvo.perdaPct) && (
+          <div className="py-2 border-t border-line text-[12px] text-ink3">
+            Avisa em {[c.alvo.lucroPct && `lucro de ${c.alvo.lucroPct}%`, c.alvo.perdaPct && `perda de ${c.alvo.perdaPct}%`].filter(Boolean).join(" e ")}
+          </div>
+        )}
       </div>
 
       <label className="block mb-2"><span className="block text-[13px] text-ink3 px-1 mb-1">Atualizar o preço por unidade (R$)</span>

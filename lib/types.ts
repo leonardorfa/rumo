@@ -210,6 +210,9 @@ export interface Cripto {
   price?: number; // último preço por unidade (R$)
   priceAt?: string; // quando o preço foi atualizado (ISO)
   hist?: { date: string; value: number }[]; // valor da posição ao fim de cada dia atualizado
+  desde?: string; // dia em que você pôs (a posição inicial)
+  compras?: { id: string; date: string; qty: number; pago: number }[]; // compras depois da posição inicial
+  alvo?: { lucroPct?: number; perdaPct?: number }; // avisar quando o resultado chegar nesses %
 }
 
 export interface Data {
