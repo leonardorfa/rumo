@@ -60,6 +60,7 @@ export interface Prefs {
   returnPct: number; // retorno esperado ao ano, para as metas de longo prazo
   payday: number; // dia do salário (0 = descobrir pelo extrato)
   countCripto: boolean; // cripto entra no "meu dinheiro"
+  autoCotacao: boolean; // atualiza os preços das moedas ao abrir a aba Cripto
 }
 
 export interface Config {

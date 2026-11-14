@@ -358,6 +358,7 @@ function Settings({ cfg, goCdb }: { cfg: Config; goCdb: () => void }) {
         <Row label="Abrir com valores escondidos" value={p.hideOnStart ? "sim" : "não"} onClick={() => setP({ hideOnStart: !p.hideOnStart })} />
         <Row label="O que te devem conta no meu dinheiro" value={p.countReceivables ? "sim" : "não"} onClick={() => setP({ countReceivables: !p.countReceivables })} />
         <Row label="Fatura do cartão em aberto desconta do meu dinheiro" sub={p.countInvoices ? "ligado: a fatura importada e não paga sai do disponível" : "desligado: a fatura não mexe em nada (o pagamento aparece no extrato)"} value={p.countInvoices ? "sim" : "não"} onClick={() => setP({ countInvoices: !p.countInvoices })} />
+        <Row label="Atualizar cotações ao abrir Cripto" sub="consulta a Coinbase e envia só o símbolo da moeda (SOL, BTC…)" value={p.autoCotacao ? "sim" : "não"} onClick={() => setP({ autoCotacao: !p.autoCotacao })} />
         <Row label="Cripto conta no meu dinheiro" value={p.countCripto ? "sim" : "não"} onClick={() => setP({ countCripto: !p.countCripto })} />
         <Row label="Animações e gráficos 3D" value={p.anim ? "sim" : "não"} onClick={() => setP({ anim: !p.anim })} />
         <Row label="Data de nascimento" value={p.birth ? new Date(p.birth + "T12:00:00").toLocaleDateString("pt-BR") : "informar"} onClick={() => setForm({

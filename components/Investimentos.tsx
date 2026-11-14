@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { brl, brl0 } from "@/lib/format";
 import { apagarCripto, buscarPrecos, comprarCripto, criptoOf, definirPreco, posicao, salvarCripto, totais, venderCripto } from "@/lib/cripto";
 import { update, useData } from "@/lib/store";
@@ -39,15 +39,21 @@ function CriptoTab() {
   const perdeu = t.resultado < 0;
   const ultima = lista.map((c) => c.priceAt).filter(Boolean).sort().pop();
 
-  async function atualizar() {
+  async function atualizar(silencioso = false) {
     setBuscando(true);
     const p = await buscarPrecos(lista.map((c) => c.symbol));
     setBuscando(false);
     const n = Object.keys(p).length;
-    if (!n) { toast("Não consegui as cotações agora. Você pode digitar o preço em cada moeda."); return; }
+    if (!n) { if (!silencioso) toast("Não consegui as cotações agora. Você pode digitar o preço em cada moeda."); return; }
     update((dd) => criptoOf(dd).reduce((acc, c) => (p[c.symbol] ? definirPreco(acc, c.id, p[c.symbol]) : acc), dd));
-    toast(`${n} cotaç${n === 1 ? "ão atualizada" : "ões atualizadas"}`);
+    if (!silencioso) toast(`${n} cotaç${n === 1 ? "ão atualizada" : "ões atualizadas"}`);
   }
+  // ao abrir a aba, atualiza sozinho (se ligado em Mais e se os preços têm mais de 5 min)
+  useEffect(() => {
+    if (!lista.length || d.config.prefs.autoCotacao === false) return;
+    if (ultima && Date.now() - Date.parse(ultima) < 5 * 60 * 1000) return;
+    atualizar(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!lista.length) {
     return (
@@ -73,10 +79,10 @@ function CriptoTab() {
             <span className={`font-semibold ${perdeu ? "text-alert" : "text-ok"}`}><Money v={Math.abs(t.resultado)} /> ({sinal(t.pct)}{ptNum(t.pct, 2)}%)</span>
           </div>
         </div>
-        <Button tone="primary" className="w-full mt-3" onClick={atualizar} disabled={buscando}>{buscando ? "Buscando…" : "Atualizar cotações"}</Button>
+        <Button tone="primary" className="w-full mt-3" onClick={() => atualizar()} disabled={buscando}>{buscando ? "Buscando…" : "Atualizar cotações"}</Button>
         <div className="text-[12px] text-ink3 mt-2">
           {ultima ? `Preços de ${new Date(ultima).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}. ` : "Sem preço ainda: o app usa o custo médio até você atualizar. "}
-          O botão consulta a Coinbase e só envia o símbolo da moeda (SOL, BTC…). Ou digite o preço em cada moeda.
+          Ao abrir esta aba o app consulta a Coinbase e só envia o símbolo da moeda (SOL, BTC…). Dá para desligar em Mais, ou digitar o preço em cada moeda.
         </div>
       </Card>
 

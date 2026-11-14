@@ -8,7 +8,7 @@ import type { Bill, CdbTranche, Config, Data, Envelope, FatherEntry, Invoice, Pa
 const KEY = "financas:v1";
 
 export const DEFAULT_PREFS: Config["prefs"] = {
-  name: "", hideOnStart: true, avgMonths: 3, economyPct: 30, areasCount: 6, alertPct: 80, backupDays: 14, payday: 0, countReceivables: true, countInvoices: false, countCripto: true, anim: true, birth: "", returnPct: 10,
+  name: "", hideOnStart: true, avgMonths: 3, economyPct: 30, areasCount: 6, alertPct: 80, backupDays: 14, payday: 0, countReceivables: true, countInvoices: false, countCripto: true, autoCotacao: true, anim: true, birth: "", returnPct: 10,
 };
 
 export const DEFAULT_CONFIG: Config = {
