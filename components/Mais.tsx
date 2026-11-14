@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CATEGORIES, KINDS, catIcon, catName, pickerGroups } from "@/lib/categories";
-import { NeedsPassword, pdfToText } from "@/lib/pdf";
+import { LeituraDemorou, NeedsPassword, pdfToText } from "@/lib/pdf";
 import { parseInvoiceText, type ParsedInvoice } from "@/lib/invoice";
 import { faceIdSupported, hashPin, registerFaceId } from "@/lib/lock";
 import { prettyName } from "@/lib/classifier";
@@ -59,6 +59,7 @@ export default function Mais({ goReview, goCdb }: { goReview: () => void; goCdb:
       return r.data;
     });
     setStats(s);
+    if (s) toast(`Extrato lido: ${s.imported} nova${s.imported === 1 ? "" : "s"}, ${s.duplicates} já tinha${s.duplicates === 1 ? "" : "m"}`);
   }
 
   return (
@@ -228,7 +229,7 @@ function PdfPicker({ onText }: { onText: (t: string) => void }) {
       if (e instanceof NeedsPassword) {
         if (password) toast("Senha errada");
         setFile(f);
-      } else alert("Não consegui ler esse PDF.");
+      } else alert(e instanceof LeituraDemorou ? "A leitura do PDF demorou demais e foi cancelada. Tente de novo; se repetir, use “Colar texto do extrato”." : "Não consegui ler esse PDF.");
     } finally {
       setBusy(false);
     }
@@ -545,7 +546,7 @@ function InvoiceImport({ goReview }: { goReview: () => void }) {
       setPwFile(null);
     } catch (e) {
       if (e instanceof NeedsPassword) setPwFile(f);
-      else alert("Não consegui ler esse PDF.");
+      else alert(e instanceof LeituraDemorou ? "A leitura do PDF demorou demais e foi cancelada. Tente de novo; se repetir, use “Colar texto do extrato”." : "Não consegui ler esse PDF.");
     } finally {
       setBusy(false);
     }
