@@ -10,6 +10,7 @@ import {
 import { update, useData } from "@/lib/store";
 import type { Cardio, Routine, Workout } from "@/lib/types";
 import { Bars3D, BarsChart, MiniTrend, TrendChart } from "./charts";
+import CalendarioTreino from "./CalendarioTreino";
 import { AguaCard, MetasSemana, PesoLevantado } from "./Habitos";
 import { act, Button, Card, Progress, Section, Segmented, Sheet, Title, toast } from "./ui";
 
@@ -47,6 +48,7 @@ function Hoje() {
   const [treino, setTreino] = useState<{ w?: Workout; routineId?: string; exercicios?: string[] } | null>(null);
   const [peso, setPeso] = useState(false);
   const [outro, setOutro] = useState(false);
+  const [calendario, setCalendario] = useState(false);
   const wd = new Date(hoje + "T12:00:00").getDay();
   const plano = planForDay(d, wd);
   const rotina = plano?.routine;
@@ -112,8 +114,8 @@ function Hoje() {
         )}
       </Card>
 
-      <Section>Esta semana</Section>
-      <Card>
+      <Section action={<span className="text-link text-[15px] font-semibold">Calendário ›</span>}>Esta semana</Section>
+      <Card onClick={() => setCalendario(true)}>
         <div className="grid grid-cols-7 gap-1 text-center">
           {ws.dias.map((x) => {
             const ini = WEEKDAYS[x.wd].slice(0, 3);
@@ -137,6 +139,7 @@ function Hoje() {
 
       <MetasSemana />
       <AguaCard />
+      {calendario && <CalendarioTreino onClose={() => setCalendario(false)} onEditar={(w) => setTreino({ w })} />}
 
       <Section>Peso</Section>
       <Card>

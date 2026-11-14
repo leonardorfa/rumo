@@ -520,3 +520,27 @@ export function pesoLevantado(d: Data, hoje = localDay()) {
     total: soma(() => true),
   };
 }
+
+// ---------- calendário de treino ----------
+
+/** Tudo de um dia para o calendário: treinos feitos, o que era previsto e a água. */
+export function resumoDoDia(d: Data, iso: string, hoje = localDay()) {
+  const treinos = fitOf(d).workouts.filter((w) => w.date === iso);
+  const wd = new Date(t(iso)).getDay();
+  const plano = planForDay(d, wd);
+  const series = treinos.reduce((a, w) => a + w.sets.length, 0);
+  const volume = Math.round(treinos.reduce((a, w) => a + w.sets.reduce((s, x) => s + x.kg * x.reps, 0), 0));
+  return {
+    iso, wd, treinos, plano, series, volume,
+    feito: treinos.length > 0,
+    previsto: plano !== null,
+    passou: iso < hoje,
+    hoje: iso === hoje,
+    aguaMl: aguaOf(d).log[iso] ?? 0,
+  };
+}
+/** Os exercícios de um treino com as séries de cada um, na ordem em que foram feitos (os sem série vêm no fim). */
+export function exerciciosDoTreino(w: Workout): { ex: string; sets: { kg: number; reps: number }[] }[] {
+  const ordem = [...new Set([...w.sets.map((s) => s.ex), ...(w.pend ?? [])])];
+  return ordem.map((ex) => ({ ex, sets: w.sets.filter((s) => s.ex === ex).map(({ kg, reps }) => ({ kg, reps })) }));
+}

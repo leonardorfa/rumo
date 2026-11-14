@@ -884,3 +884,21 @@ console.log("histórico e alvos de cripto ok");
   assert.deepEqual(L.fitOf(t).workouts[0].pend, ["Tríceps corda", "Crucifixo"]);
 }
 console.log("regressões ok");
+
+{
+  const L = require("../lib/life") as typeof import("../lib/life");
+  const d0 = { txs: [], father: [], goals: [], config: DEFAULT_CONFIG, fit: undefined } as unknown as Data;
+  // quinta-feira 12/11/2026 tem treino previsto (rotina) e foi feito; sexta só prevista; água anotada na quinta
+  let d = L.saveRoutine(d0, { id: "r1", name: "Perna", exercises: ["Leg press"] });
+  d = L.setTrainingDay(d, 4, "r1"); d = L.setTrainingDay(d, 5, "r1");
+  d = L.saveWorkout(d, { id: "", date: "2026-11-12", sets: [{ ex: "Leg press", kg: 100, reps: 10 }, { ex: "Leg press", kg: 100, reps: 8 }], pend: ["Stiff"] });
+  d = L.addAgua(d, 2250, "2026-11-12");
+  const q = L.resumoDoDia(d, "2026-11-12", "2026-11-14");
+  assert.deepEqual([q.feito, q.previsto, q.passou, q.hoje, q.series, q.volume, q.aguaMl], [true, true, true, false, 2, 1800, 2250]);
+  const s = L.resumoDoDia(d, "2026-11-13", "2026-11-14");
+  assert.deepEqual([s.feito, s.previsto, s.passou], [false, true, true], "previsto e não feito = perdido");
+  const dom = L.resumoDoDia(d, "2026-11-15", "2026-11-14");
+  assert.deepEqual([dom.feito, dom.previsto, dom.passou, dom.aguaMl], [false, false, false, 0], "descanso no futuro");
+  assert.deepEqual(L.exerciciosDoTreino(q.treinos[0]), [{ ex: "Leg press", sets: [{ kg: 100, reps: 10 }, { kg: 100, reps: 8 }] }, { ex: "Stiff", sets: [] }]);
+}
+console.log("calendário de treino ok");
