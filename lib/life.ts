@@ -373,7 +373,7 @@ export function buildIcs(d: Data, now = new Date()): string {
       "END:VEVENT",
     ].join("\r\n");
   });
-  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Orbita//Treino//PT", "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR"].join("\r\n");
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Orbita//Treino//PT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", ...ev, "END:VCALENDAR", ""].join("\r\n");
 }
 
 // ---------- configuração inicial por arquivo ----------
@@ -484,7 +484,7 @@ export function buildAguaIcs(d: Data, now = new Date()): string {
       "END:VEVENT",
     ].join("\r\n");
   });
-  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Orbita//Agua//PT", "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR"].join("\r\n");
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Orbita//Agua//PT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", ...ev, "END:VCALENDAR", ""].join("\r\n");
 }
 
 /**
