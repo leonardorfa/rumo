@@ -23,6 +23,10 @@ async function lerPdf(file: File, password?: string): Promise<string> {
   etapa("abrindo o leitor de PDF");
   const pdfjs = await import(/* webpackIgnore: true */ `${base}/pdfjs-legacy/pdf.min.mjs`);
   pdfjs.GlobalWorkerOptions.workerSrc = `${base}/pdfjs-legacy/pdf.worker.min.mjs`;
+  // Sem Web Worker: o pdf.js usa o motor de leitura na própria página quando ele já está carregado.
+  // Extratos são pequenos e isso evita o travamento do worker no iPhone (aberto como app na tela de início).
+  etapa("carregando o motor de leitura");
+  (globalThis as { pdfjsWorker?: unknown }).pdfjsWorker ??= await import(/* webpackIgnore: true */ `${base}/pdfjs-legacy/pdf.worker.min.mjs`);
   let doc;
   try {
     // sem isso, um PDF que trava a leitura deixava o app esperando para sempre
