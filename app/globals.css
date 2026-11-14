@@ -2,13 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fonte no próprio app: funciona offline, sem pedir nada para a internet. */
-@font-face {
-  font-family: "Plus Jakarta Sans";
-  src: url("/fonts/pjs.woff2") format("woff2");
-  font-weight: 200 800;
-  font-display: swap;
-}
+/* A fonte (Plus Jakarta Sans, no próprio app, offline) é declarada em layout.tsx, onde o caminho leva o prefixo do endereço. */
 
 /* Paleta navy: #05183c, #06296b, #1a3c7d, #101217, #0c0d0d.
    As cores de gráfico saem de uma paleta validada para daltonismo. */

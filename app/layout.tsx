@@ -25,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <style dangerouslySetInnerHTML={{ __html: `@font-face{font-family:"Plus Jakarta Sans";src:url("${base}/fonts/pjs.woff2") format("woff2");font-weight:200 800;font-display:swap}` }} />
         {/* Tema salvo aplicado antes de pintar a tela. */}
         <script
           dangerouslySetInnerHTML={{

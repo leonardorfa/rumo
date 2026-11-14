@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "check": "tsc checks/selfcheck.ts --outDir .check --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node .check/checks/selfcheck.js"
+    "check": "tsc checks/selfcheck.ts --outDir .check --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node .check/checks/selfcheck.js",
+    "publicar": "sh scripts/publicar.sh"
   },
   "dependencies": {
     "next": "14.2.35",
