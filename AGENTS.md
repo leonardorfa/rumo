@@ -23,6 +23,8 @@ Leia também o `HANDOFF.md` (contexto e pendências) e o `README.md` (como rodar
 
 | Data | O que quebrou | Causa | Teste (em `checks/selfcheck.ts`) |
 |---|---|---|---|
+| 2026-11-14 | Fatura do C6 sem total e sem vencimento, e o pagamento da fatura entrava como compra | A fatura atual traz "Data do vencimento: 01 de Novembro" (sem ano), o total como "Pagamento total" e o pagamento como "Inclusao de Pagamento" | "fatura formato atual do C6" |
+| 2026-11-14 | Extrato novo não atualizava o saldo da conta e ganhava uma entrada falsa com o valor do saldo | O C6 mudou o formato ("Saldo no dia da exportação" e "15/10/2026 a 14/11/2026 R$ …"); o leitor só conhecia "Saldo do dia •" e leu a linha do período como transação | "extrato formato novo do C6" (saldo, data, sem entrada falsa e limpeza de quem já importou) |
 | 2026-11-14 | Janela da senha do PDF aparecia no meio da página e escurecia só um cartão (iPhone) | A janela `fixed` ficava presa ao cartão animado | "Sheet precisa ir para o <body> (portal)" |
 | 2026-11-14 | Fonte do app não carregava no GitHub Pages | `url("/fonts/...")` sem o prefixo do endereço | "CSS não pode ter url() absoluta", "a fonte precisa usar o prefixo" |
 | 2026-11-14 | Calendário do iPhone não importava os lembretes | `.ics` sem quebra de linha no fim e sem `METHOD` | ".ics termina com CRLF", ".ics com METHOD:PUBLISH" |

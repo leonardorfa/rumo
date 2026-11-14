@@ -40,8 +40,10 @@ export function parseStatementText(
     if (section) sectionYear = Number(section[1]);
     // Cabeçalhos, saldos diários e o resumo "Entradas: R$ … • Saídas: R$ …".
     if (
-      /^(data|dia|hist[oó]rico|valor|descri|saldo|total|per[ií]odo|extrato)\b/i.test(line) ||
-      /entradas:|sa[ií]das:/i.test(line)
+      /^(data|dia|hist[oó]rico|valor|descri|saldo|total|per[ií]odo|extrato|exportado)\b/i.test(line) ||
+      /entradas:|sa[ií]das:/i.test(line) ||
+      // formato novo do C6: "15/10/2026 a 14/11/2026 R$ 3.839,63" é o período e o saldo, não uma transação
+      PERIODO_NOVO.test(line)
     ) {
       continue;
     }
@@ -77,9 +79,17 @@ function extractClosingBalance(lines: string[]): number | null {
   // O cabeçalho do C6 ("Saldo do dia • …") é o saldo na data da exportação.
   const header = lines.find((l) => /saldo\s+do\s+dia\s*•/i.test(l));
   if (header) return extractAmount(header)?.value ?? null;
+  // Formato novo do C6 (nov/2026): "Período da Exportação  Saldo no dia da exportação"
+  // e, na linha de baixo, "15/10/2026 a 14/11/2026 R$ 3.839,63".
+  const i = lines.findIndex((l) => /saldo\s+no\s+dia\s+da\s+exporta/i.test(l));
+  if (i >= 0) {
+    const prox = (lines[i + 1] ?? "").trim();
+    const v = extractAmount(lines[i]) ?? (PERIODO_NOVO.test(prox) ? extractAmount(prox) : null);
+    if (v) return v.value;
+  }
   let last: number | null = null;
   for (const rawLine of lines) {
-    if (!/saldo\s+(do\s+dia|atual|final|em\s+conta|dispon)/i.test(rawLine)) continue;
+    if (!/saldo\s+(cont[aá]bil\s+)?(do\s+dia|atual|final|em\s+conta|dispon)/i.test(rawLine)) continue;
     const amt = extractAmount(rawLine);
     if (amt) last = amt.value;
   }
@@ -89,8 +99,13 @@ function extractClosingBalance(lines: string[]): number | null {
 const MONTHS = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho",
   "agosto", "setembro", "outubro", "novembro", "dezembro"];
 
-/** "… até 10 de junho de 2026" → { month: 6, year: 2026, iso: "2026-06-10" } */
+/** Linha de período do formato novo do C6: "15/10/2026 a 14/11/2026 …". */
+const PERIODO_NOVO = /^(\d{2})\/(\d{2})\/(\d{4})\s+a\s+(\d{2})\/(\d{2})\/(\d{4})/;
+
+/** "… até 10 de junho de 2026" ou "15/10/2026 a 14/11/2026" → { month: 11, year: 2026, iso: "2026-11-14" } */
 function periodEnd(lines: string[]): { month: number; year: number; iso: string } | null {
+  const novo = lines.map((l) => l.trim().match(PERIODO_NOVO)).find(Boolean);
+  if (novo) return { month: Number(novo[5]), year: Number(novo[6]), iso: `${novo[6]}-${novo[5]}-${novo[4]}` };
   const line = lines.find((l) => /per[ií]odo/i.test(l));
   const m = line
     ?.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()

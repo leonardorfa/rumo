@@ -18,7 +18,7 @@ const MONTHS: Record<string, number> = {
 };
 
 // Linhas de resumo, que não são compra.
-const SKIP = /total da fatura|total a pagar|pagamento m[ií]nimo|limite|dispon[ií]vel|vencimento|fatura anterior|saldo anterior|resumo|demonstrativo|parcelamento|encargos previstos|pontos|d[eé]bito autom|pagamento (recebido|efetuado)|pagto recebido|^\s*data\b|^\s*descri/i;
+const SKIP = /total da fatura|total a pagar|pagamento m[ií]nimo|limite|dispon[ií]vel|vencimento|fatura anterior|saldo anterior|resumo|demonstrativo|parcelamento|encargos previstos|pontos|d[eé]bito autom|pagamento (recebido|efetuado)|pagto recebido|inclusao de pagamento|^\s*data\b|^\s*descri/i;
 
 const clean = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -27,7 +27,7 @@ export function parseInvoiceText(text: string, defaultYear?: number): ParsedInvo
   const purchases: ParsedInvoice["purchases"] = [];
   let skipped = 0;
 
-  const dueDate = findDue(lines);
+  const dueDate = findDue(lines, defaultYear);
   const closeMonth = dueDate ? Number(dueDate.slice(5, 7)) : new Date().getMonth() + 1;
   const closeYear = dueDate ? Number(dueDate.slice(0, 4)) : defaultYear || new Date().getFullYear();
   // Compra de mês posterior ao vencimento é do ano anterior (virada de ano).
@@ -63,23 +63,38 @@ export function parseInvoiceText(text: string, defaultYear?: number): ParsedInvo
   return { purchases, total: findTotal(lines), dueDate, skipped };
 }
 
-function findDue(lines: string[]): string | null {
+function findDue(lines: string[], defaultYear?: number): string | null {
   for (const l of lines) {
     if (!/vencimento/i.test(clean(l))) continue;
     const dmy = l.match(/(\d{2})\/(\d{2})\/(\d{4})/);
     if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
-    const dmn = clean(l).match(/(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(\d{4})/);
-    if (dmn) {
-      const m = MONTHS[dmn[2].slice(0, 3)];
-      if (m) return `${dmn[3]}-${String(m).padStart(2, "0")}-${dmn[1].padStart(2, "0")}`;
+    // "10 de outubro de 2026" ou, na fatura atual do C6, só "01 de Novembro" (sem ano)
+    const dmn = clean(l).match(/(\d{1,2})\s+de\s+([a-z]+)(?:\s+de\s+(\d{4}))?/);
+    const m = dmn ? MONTHS[dmn[2].slice(0, 3)] : 0;
+    if (dmn && m) {
+      const y = dmn[3] ? Number(dmn[3]) : anoProvavel(m, defaultYear);
+      return `${y}-${String(m).padStart(2, "0")}-${dmn[1].padStart(2, "0")}`;
     }
   }
   return null;
 }
 
+/** Ano de um vencimento sem ano: o mais perto de hoje (fatura de janeiro vista em dezembro é do ano que vem). */
+function anoProvavel(mes: number, defaultYear?: number): number {
+  if (defaultYear) return defaultYear;
+  const hoje = new Date();
+  const y = hoje.getFullYear(), atual = hoje.getMonth() + 1;
+  return mes - atual > 6 ? y - 1 : atual - mes > 6 ? y + 1 : y;
+}
+
 function findTotal(lines: string[]): number | null {
-  const l = lines.find((x) => /total da fatura|total a pagar/i.test(clean(x)));
-  return l ? pickAmount(l, true)?.value ?? null : null;
+  // "Total da fatura", "Total a pagar" ou, na fatura atual do C6, "1. Pagamento total Recomendado R$ …"
+  for (const x of lines) {
+    if (!/total da fatura|total a pagar|pagamento total/i.test(clean(x))) continue;
+    const v = pickAmount(x, true)?.value;
+    if (v != null) return v;
+  }
+  return null;
 }
 
 function pickDate(line: string, yearFor: (m: number) => number) {

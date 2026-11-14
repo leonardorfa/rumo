@@ -902,3 +902,54 @@ console.log("regressões ok");
   assert.deepEqual(L.exerciciosDoTreino(q.treinos[0]), [{ ex: "Leg press", sets: [{ kg: 100, reps: 10 }, { kg: 100, reps: 8 }] }, { ex: "Stiff", sets: [] }]);
 }
 console.log("calendário de treino ok");
+
+// ---- regressão 2026-11-14: extrato no formato novo do C6 não lia o saldo e criava uma entrada falsa ----
+{
+  const S = require("../lib/store") as typeof import("../lib/store");
+  const NOVO = [
+    "Extrato da conta",
+    "Exportado em 14/11/26 às 11:40",
+    "Período da Exportação Saldo no dia da exportação",
+    "15/10/2026 a 14/11/2026 R$ 1.234,56",
+    "Outubro 2026 ( 15/10/2026 - 31/10/2026 ) Entradas: R$ 4,00 • Saídas: R$ 40,90",
+    "Data Data",
+    "da transação de processamento Tipo Descrição Valor",
+    "15/10 15/10 Entradas CASHBACK BOLETOS R$ 4,00",
+    "Saldo contábil do dia 15/10/26 R$ 1.000,00",
+    "16/10 16/10 Débito de Cartão LOJA EXEMPLO -R$ 40,90",
+    "Novembro 2026 ( 01/11/2026 - 14/11/2026 ) Entradas: R$ 0,00 • Saídas: R$ 10,00",
+    "13/11 13/11 Pix Pix enviado para FULANO -R$ 10,00",
+    "Saldo contábil do dia 13/11/26 R$ 1.234,56",
+  ].join("\n");
+  const r = parseStatementText(NOVO);
+  assert.equal(r.closingBalance, 1234.56, "formato novo: saldo no dia da exportação");
+  assert.equal(r.statementDate, "2026-11-14", "formato novo: data do fim do período");
+  assert.ok(!r.transactions.some((t) => /^a \d/.test(t.description)), "a linha do período não vira transação");
+  assert.deepEqual(r.transactions.map((t) => [t.date, t.amount]), [["2026-10-15", 4], ["2026-10-16", -40.9], ["2026-11-13", -10]]);
+  // quem já importou com o defeito: a entrada falsa some ao abrir o app (backup restaurado passa pelo mesmo caminho)
+  const sujo = JSON.stringify({ version: 1, txs: [
+    { id: "x", date: "2026-10-15", description: "a 14/11/2026", amount: 3839.63, category: "income_other", review: true },
+    { id: "y", date: "2026-10-15", description: "CASHBACK", amount: 4, category: "income_other", review: false },
+  ], father: [], rules: [], config: DEFAULT_CONFIG, lastBackup: null });
+  assert.deepEqual(S.parseBackup(sujo).data.txs.map((t) => t.id), ["y"], "entrada falsa removida");
+}
+console.log("extrato formato novo do C6 ok");
+
+// ---- regressão 2026-11-14: fatura atual do C6 sem total, sem vencimento e com o pagamento contado como compra ----
+{
+  const FATURA_NOVA = [
+    "Data do vencimento: 01 de Novembro",
+    "Limite total: R$ 5.000,00",
+    "1. Pagamento total Recomendado 2. Pagamento mínimo ou parcial 3. Parcelamento em 3x",
+    "Vencimento: 01 de Novembro Débito automático: Desativado FULANO",
+    "1. Pagamento total Recomendado R$ 876,54",
+    "26/09 LOJA EXEMPLO - Parcela 1/6 R$ 50,00",
+    "05/10 ASSINATURA EXEMPLO R$ 120,00",
+    "01/10 Inclusao de Pagamento -R$ 700,00",
+  ].join("\n");
+  const f = parseInvoiceText(FATURA_NOVA, 2026);
+  assert.equal(f.dueDate, "2026-11-01", "vencimento sem ano");
+  assert.equal(f.total, 876.54, "total vem de 'Pagamento total'");
+  assert.deepEqual(f.purchases.map((p) => p.date), ["2026-09-26", "2026-10-05"], "o pagamento da fatura não é compra");
+}
+console.log("fatura formato atual do C6 ok");

@@ -89,6 +89,8 @@ function withDefaults(d: Data): Data {
   // Passa a render a partir de hoje.
   if (config.rendaFixa > 0 && !config.rendaFixaDate) config.rendaFixaDate = localDay();
   const out = { ...empty(), ...d, config };
+  // Extrato no formato novo do C6 (nov/2026) virava uma entrada falsa "a 14/11/2026" com o saldo como valor: some aqui.
+  out.txs = (out.txs ?? []).filter((t) => t.manual || !/^a \d{2}\/\d{2}\/\d{4}$/i.test(t.description.trim()));
   return config.rendaFixa > 0 && !(config.cdb.tranches ?? []).length ? migrarParaAplicacoes(out) : out;
 }
 
