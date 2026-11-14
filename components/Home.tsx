@@ -37,7 +37,12 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
   const mudaGrafico = (g: "2d" | "3d") => { setGrafico(g); try { localStorage.setItem("grafico-cat", g); } catch { /* ok */ } };
   const pendentes = fatherPending(d);
   const meu = parts.total;
-  const teto = useMemo(() => Math.max(0, computeScenarios(projectionInput(d))[0].monthlyVariable), [d]);
+  const cenarios = useMemo(() => computeScenarios(projectionInput(d)), [d]);
+  const teto = Math.max(0, cenarios[0].monthlyVariable);
+  // a barra de gasto segue o cenário escolhido em Metas (Teto, Seu ritmo ou Econômico)
+  const escolhido = (() => { try { return localStorage.getItem("cenario-meta"); } catch { return null; } })();
+  const cen = cenarios.find((c) => c.key === escolhido) ?? cenarios[0];
+  const limite = Math.max(0, cen.monthlyVariable);
   const monthTxs = ofMonth(d.txs, month);
   const spent = variableSpend(monthTxs);
   const prev = shiftMonth(month, -1);
@@ -271,7 +276,7 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
             <Card onClick={() => setExplMeta(true)}>
               <div className="text-[15px] font-semibold mb-3 flex justify-between">Metas <span className="text-ink3" aria-hidden>›</span></div>
               <Goal label="Meta de dezembro" pct={goalPct} color="var(--meta)" />
-              <Goal label="Teto do mês" pct={teto ? Math.min(100, Math.round((spent / teto) * 100)) : spent > 0 ? 100 : 0} color="var(--meu)" over={spent > teto} />
+              <Goal label={cen.key === "teto" ? "Teto do mês" : `Limite · ${cen.label}`} pct={limite ? Math.min(100, Math.round((spent / limite) * 100)) : spent > 0 ? 100 : 0} color="var(--meu)" over={spent > limite} />
               <div className="text-[13px] text-ink3 mt-3">
                 Faltam <Money v={Math.max(0, d.config.goalAmount - meu)} /> para a meta.
               </div>
@@ -324,7 +329,7 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
           onCat={(k) => { setExplDist(false); setCat(k); }} />
       </Sheet>
       <Sheet open={explMeta} onClose={() => setExplMeta(false)} title="Suas metas">
-        <ExplicaMetas meu={meu} alvo={d.config.goalAmount} teto={teto} spent={spent} isNow={isNow} daysLeft={daysLeft}
+        <ExplicaMetas meu={meu} alvo={d.config.goalAmount} teto={limite} nome={cen.key === "teto" ? "Teto do mês" : `Limite do mês · ${cen.label}`} spent={spent} isNow={isNow} daysLeft={daysLeft}
           onVer={() => { setExplMeta(false); goMeta(); }} />
       </Sheet>
       <TxSheet tx={open} onClose={() => setOpen(null)} />
@@ -518,8 +523,8 @@ function ExplicaGastos({ d, month, cats, spent, prevSpent, hidden, onCat }: {
 }
 
 /** Janela das Metas: duas barras e de onde vem cada número. */
-function ExplicaMetas({ meu, alvo, teto, spent, isNow, daysLeft, onVer }: {
-  meu: number; alvo: number; teto: number; spent: number; isNow: boolean; daysLeft: number; onVer: () => void;
+function ExplicaMetas({ meu, alvo, teto, nome, spent, isNow, daysLeft, onVer }: {
+  meu: number; alvo: number; teto: number; nome: string; spent: number; isNow: boolean; daysLeft: number; onVer: () => void;
 }) {
   const pctMeta = alvo ? Math.min(100, Math.round((meu / alvo) * 100)) : 0;
   const pctTeto = teto ? Math.round((spent / teto) * 100) : spent > 0 ? 100 : 0;
@@ -534,8 +539,8 @@ function ExplicaMetas({ meu, alvo, teto, spent, isNow, daysLeft, onVer }: {
         <div className="text-ink2 text-[14px] mt-1">Faltam <Money v={Math.max(0, alvo - meu)} />.</div>
       </div>
       <div className="card p-4 mb-3">
-        <div className="font-semibold">Teto do mês</div>
-        <div className="text-[13px] text-ink3 mb-2">O quanto pode gastar no dia a dia para ainda chegar na meta</div>
+        <div className="font-semibold">{nome}</div>
+        <div className="text-[13px] text-ink3 mb-2">O quanto pode gastar no dia a dia neste cenário. Troque o cenário em Metas.</div>
         <Progress value={Math.min(100, pctTeto)} max={100} color={spent > teto ? "var(--alert)" : "var(--meu)"} />
         <div className="flex justify-between mt-2 text-[15px]"><span>Gastou <Money v={spent} /></span><span className={spent > teto ? "text-alert font-semibold" : "text-ink2"}>{pctTeto}% de <Money v={teto} /></span></div>
         <div className={`text-[14px] mt-1 ${sobra < 0 ? "text-alert" : "text-ink2"}`}>

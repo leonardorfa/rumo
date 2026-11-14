@@ -15,7 +15,10 @@ import { act, Button, Card, Expandir, Money, MonthSwitcher, Progress, Section, S
 
 export default function Metas() {
   const d = useData();
-  const [key, setKey] = useState<ScenarioResult["key"]>("teto");
+  const [key, setKeyState] = useState<ScenarioResult["key"]>(() => {
+    try { const v = localStorage.getItem("cenario-meta"); return v === "ritmo" || v === "economico" ? v : "teto"; } catch { return "teto"; }
+  });
+  const setKey = (v: ScenarioResult["key"]) => { setKeyState(v); try { localStorage.setItem("cenario-meta", v); } catch { /* ok */ } };
   const input = useMemo(() => projectionInput(d), [d]);
   const scenarios = useMemo(() => computeScenarios(input), [input]);
   const s = scenarios.find((x) => x.key === key)!;
@@ -85,9 +88,6 @@ export default function Metas() {
         <Partes />
       </Card>
 
-      <Section>Limite do mês</Section>
-      <LimiteMes teto={teto} spent={variableSpend(ofMonth(d.txs, now))} input={input} />
-
       <Section>Quanto posso gastar</Section>
       <Segmented
         value={key}
@@ -121,6 +121,9 @@ export default function Metas() {
           </div>
         </Expandir>
       </Card>
+
+      <Section>Limite do mês · {s.label}</Section>
+      <LimiteMes limite={s.monthlyVariable} teto={teto} cenario={s.key} nota={s.description} spent={variableSpend(ofMonth(d.txs, now))} input={input} />
 
       <label className="flex items-center justify-between bg-card rounded-2xl px-4 py-3 mt-3 gap-3">
         <span>
@@ -498,9 +501,9 @@ function MetaInviavel({ input, ritmo, deadline, curto }: { input: ProjectionInpu
 }
 
 /** Barra do limite do mês e, por baixo, a conta que levou até ele. */
-function LimiteMes({ teto, spent, input }: { teto: number; spent: number; input: ProjectionInput }) {
-  const pct = teto ? Math.round((spent / teto) * 100) : spent > 0 ? 100 : 0;
-  const sobra = teto - spent;
+function LimiteMes({ limite, teto, cenario, nota, spent, input }: { limite: number; teto: number; cenario: ScenarioResult["key"]; nota: string; spent: number; input: ProjectionInput }) {
+  const pct = limite ? Math.round((spent / limite) * 100) : spent > 0 ? 100 : 0;
+  const sobra = limite - spent;
   const diasRest = daysInMonth(monthKey()) - new Date().getDate() + 1;
   const saldoMais = input.effectiveBalance + (input.spentThisMonth ?? 0);
   const salarios = (input.remainingMonths - (input.skipFirstMonthSalary ? 1 : 0)) * input.salary;
@@ -515,15 +518,17 @@ function LimiteMes({ teto, spent, input }: { teto: number; spent: number; input:
   );
   return (
     <Card>
-      <Progress value={Math.min(100, pct)} max={100} color={spent > teto ? "var(--alert)" : "var(--meu)"} />
+      <Progress value={Math.min(100, pct)} max={100} color={spent > limite ? "var(--alert)" : "var(--meu)"} />
       <div className="flex justify-between mt-2 text-[15px]">
         <span>Gastou <Money v={spent} /></span>
-        <span className={spent > teto ? "text-alert font-semibold" : "text-ink2"}>{pct}% de <Money v={teto} /></span>
+        <span className={spent > limite ? "text-alert font-semibold" : "text-ink2"}>{pct}% de <Money v={limite} /></span>
       </div>
       <div className={`text-[14px] mt-1 ${sobra < 0 ? "text-alert" : "text-ink2"}`}>
         {sobra >= 0 ? <>Sobram <Money v={sobra} /> neste mês{diasRest > 0 ? <> (<Money v={sobra / diasRest} /> por dia)</> : null}.</> : <>Passou <Money v={-sobra} /> do limite.</>}
       </div>
-      <Expandir className="mt-2 text-[15px]" titulo="Como o limite é calculado">
+      <div className="text-[13px] text-ink3 mt-1">{nota}</div>
+      {cenario !== "teto" && <div className="text-[13px] text-ink3 mt-0.5">O teto que bate a meta é <Money v={teto} /> por mês.</div>}
+      {cenario === "teto" && <Expandir className="mt-2 text-[15px]" titulo="Como o limite é calculado">
         <div className="divide-y divide-line mt-1 text-[15px]">
           {linha("Seu dinheiro hoje (mais o já gasto no mês)", saldoMais, "")}
           {linha(`Salários que ainda entram (${input.remainingMonths - (input.skipFirstMonthSalary ? 1 : 0)}x)`, salarios, "+")}
@@ -534,7 +539,7 @@ function LimiteMes({ teto, spent, input }: { teto: number; spent: number; input:
           <div className="flex justify-between py-1.5 font-semibold"><span>= Sobra para gastar</span><Money v={sobraTotal} /></div>
           <div className="flex justify-between py-1.5 font-semibold"><span>÷ {input.remainingMonths} meses = limite por mês</span><Money v={teto} /></div>
         </div>
-      </Expandir>
+      </Expandir>}
     </Card>
   );
 }
