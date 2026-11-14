@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CATEGORIES, KINDS, catIcon, catName, pickerGroups } from "@/lib/categories";
-import { LeituraDemorou, NeedsPassword, pdfToText } from "@/lib/pdf";
+import { etapaPdf, LeituraDemorou, NeedsPassword, pdfToText } from "@/lib/pdf";
 import { parseInvoiceText, type ParsedInvoice } from "@/lib/invoice";
 import { faceIdSupported, hashPin, registerFaceId } from "@/lib/lock";
 import { prettyName } from "@/lib/classifier";
@@ -229,7 +229,12 @@ function PdfPicker({ onText }: { onText: (t: string) => void }) {
       if (e instanceof NeedsPassword) {
         if (password) toast("Senha errada");
         setFile(f);
-      } else alert(e instanceof LeituraDemorou ? "A leitura do PDF demorou demais e foi cancelada. Tente de novo; se repetir, use “Colar texto do extrato”." : "Não consegui ler esse PDF.");
+      } else alert((e instanceof LeituraDemorou ? "A leitura do PDF demorou demais e foi cancelada." : "Não consegui ler esse PDF.") + `
+
+Parou em: ${etapaPdf || "início"}.
+Detalhe: ${(e as Error)?.name}: ${(e as Error)?.message ?? ""}
+
+Se repetir, use “Colar texto do extrato”.`);
     } finally {
       setBusy(false);
     }
@@ -546,7 +551,12 @@ function InvoiceImport({ goReview }: { goReview: () => void }) {
       setPwFile(null);
     } catch (e) {
       if (e instanceof NeedsPassword) setPwFile(f);
-      else alert(e instanceof LeituraDemorou ? "A leitura do PDF demorou demais e foi cancelada. Tente de novo; se repetir, use “Colar texto do extrato”." : "Não consegui ler esse PDF.");
+      else alert((e instanceof LeituraDemorou ? "A leitura do PDF demorou demais e foi cancelada." : "Não consegui ler esse PDF.") + `
+
+Parou em: ${etapaPdf || "início"}.
+Detalhe: ${(e as Error)?.name}: ${(e as Error)?.message ?? ""}
+
+Se repetir, use “Colar texto do extrato”.`);
     } finally {
       setBusy(false);
     }
