@@ -144,6 +144,23 @@ export function Button({ children, onClick, tone = "fill", className = "", disab
 }
 
 // ---------- folha que sobe de baixo ----------
+// Com uma janela aberta, a página de trás não pode rolar (no iPhone ela rolava junto e a janela ficava torta).
+let travas = 0;
+let rolagemSalva = 0;
+function travarRolagem() {
+  if (travas++ > 0) return;
+  rolagemSalva = window.scrollY;
+  const b = document.body.style;
+  b.position = "fixed"; b.top = `-${rolagemSalva}px`; b.left = "0"; b.right = "0"; b.width = "100%";
+}
+function soltarRolagem() {
+  if (--travas > 0) return;
+  travas = 0;
+  const b = document.body.style;
+  b.position = ""; b.top = ""; b.left = ""; b.right = ""; b.width = "";
+  window.scrollTo(0, rolagemSalva);
+}
+
 export function Sheet({ open, onClose, title, children }: {
   open: boolean; onClose: () => void; title: string; children: React.ReactNode;
 }) {
@@ -201,6 +218,12 @@ export function Sheet({ open, onClose, title, children }: {
       v?.removeEventListener("scroll", sync);
     };
   }, [open, onClose]);
+  const ativa = open || mostrando;
+  useEffect(() => {
+    if (!ativa) return;
+    travarRolagem();
+    return soltarRolagem;
+  }, [ativa]);
   if ((!open && !mostrando) || typeof document === "undefined") return null;
   // Vai para o <body>: dentro de um cartão com animação, o iPhone prendia a janela (fixa) ao cartão e ela aparecia no meio da página.
   return createPortal(
@@ -211,7 +234,7 @@ export function Sheet({ open, onClose, title, children }: {
         if (/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
       }}>
       <div className="sheet-scrim absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="sheet-in relative w-full max-w-[480px] overflow-y-auto bg-bg rounded-t-3xl px-4 pt-2"
+      <div className="sheet-in relative w-full max-w-[480px] overflow-y-auto overscroll-contain bg-bg rounded-t-3xl px-4 pt-2"
         style={{ maxHeight: vv ? `${Math.min(vv.h - 8, vv.h * 0.94)}px` : "88vh", paddingBottom: "calc(20px + env(safe-area-inset-bottom))" }}>
         <div className="mx-auto mt-1 mb-3 h-1.5 w-10 rounded-full bg-line" />
         <div className="flex items-center justify-between mb-3">

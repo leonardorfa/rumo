@@ -4,7 +4,7 @@ import { useState } from "react";
 import { shareFile } from "@/lib/backup";
 import { localDay } from "@/lib/format";
 import {
-  addAgua, ALVOS_PADRAO, alvosOf, aguaMarcos, aguaOf, aguaSemana, AGUA_PADRAO, buildAguaIcs, feitoNaSemana, fmtAgua, GRUPOS, pesoLevantado, setAgua, setAlvos,
+  addAgua, aplicarObjetivo, OBJETIVOS, ALVOS_PADRAO, alvosOf, aguaMarcos, aguaOf, aguaSemana, AGUA_PADRAO, buildAguaIcs, feitoNaSemana, fmtAgua, GRUPOS, pesoLevantado, setAgua, setAlvos,
 } from "@/lib/life";
 import { update, useData } from "@/lib/store";
 import { Button, Card, Expandir, Progress, Section, Sheet, toast } from "./ui";
@@ -107,6 +107,13 @@ export function MetasSemana() {
     <>
       <Section action={<button onClick={() => setCfg(true)} className="text-link text-[15px] font-semibold">Ajustar</button>}>Metas da semana</Section>
       <Card>
+        <label className="block mb-3">
+          <span className="block text-[13px] text-ink3 px-1 mb-1">Meu objetivo</span>
+          <select value={al.objetivo} onChange={(e) => update((dd) => aplicarObjetivo(dd, e.target.value))}>
+            {OBJETIVOS.map((o) => <option key={o.key} value={o.key}>{o.nome}</option>)}
+            {al.objetivo === "personalizado" && <option value="personalizado">Personalizado (ajustado por mim)</option>}
+          </select>
+        </label>
         <div className="flex justify-between text-[15px]"><span className="font-semibold">Cardio</span><span className="text-ink2">{feito.cardio} de {al.cardioMin} min</span></div>
         <div className="mt-1.5 mb-4"><Progress value={Math.min(feito.cardio, al.cardioMin)} max={al.cardioMin} color="var(--s3)" /></div>
         {grupos.map((g) => (
@@ -120,9 +127,9 @@ export function MetasSemana() {
         ))}
         <Expandir className="mt-3 text-[14px]" titulo="De onde vêm esses números">
           <div className="text-[13px] text-ink2 mt-1 flex flex-col gap-2">
-            <p>Cardio: 150 min por semana é o mínimo de atividade moderada que a Organização Mundial da Saúde recomenda a adultos.</p>
-            <p>Séries: a meta-análise de Schoenfeld, Ogborn e Krieger (2017) achou mais ganho de massa com 10 ou mais séries por semana em cada músculo. Pelland e colegas (2024, ainda preprint) indicam que mais séries seguem ajudando, mas cada vez menos. Na prática, a faixa útil fica entre 10 e 20 séries.</p>
-            <p>Bíceps e tríceps já são puxados e empurrados nos exercícios de costas e peito, por isso o padrão é menor neles. É um ponto de partida: ajuste do seu jeito.</p>
+            {OBJETIVOS.find((o) => o.key === al.objetivo) && <p><b>{OBJETIVOS.find((o) => o.key === al.objetivo)!.nome}.</b> {OBJETIVOS.find((o) => o.key === al.objetivo)!.nota}</p>}
+            <p>Bíceps e tríceps já são puxados e empurrados nos exercícios de costas e peito, por isso as metas deles são menores. Perto de 10 a 20 séries por músculo é a faixa útil para ganhar massa.</p>
+            <p>São pontos de partida tirados da literatura, não prescrição: a resposta muda de pessoa para pessoa. Ajuste do seu jeito.</p>
           </div>
         </Expandir>
       </Card>
@@ -152,7 +159,9 @@ function AlvosConfig({ onClose }: { onClose: () => void }) {
       </div>
       <Button tone="primary" className="w-full mb-2" onClick={() => {
         const c = Math.round(parse(cardio));
-        update((dd) => setAlvos(dd, { cardioMin: Number.isFinite(c) && c >= 0 ? c : al.cardioMin, series: Object.fromEntries(nomes.map((g) => [g, Math.max(0, Math.round(parse(series[g]) || 0))])) }));
+        const novas = Object.fromEntries(nomes.map((g) => [g, Math.max(0, Math.round(parse(series[g]) || 0))]));
+        const mudou = nomes.some((g) => novas[g] !== (al.series[g] ?? 0)) || (Number.isFinite(c) && c !== al.cardioMin);
+        update((dd) => setAlvos(dd, { cardioMin: Number.isFinite(c) && c >= 0 ? c : al.cardioMin, series: novas, ...(mudou ? { objetivo: "personalizado" } : {}) }));
         onClose();
       }}>Salvar</Button>
       <Button className="w-full" onClick={() => { setCardio(String(ALVOS_PADRAO.cardioMin)); setSeries(Object.fromEntries(nomes.map((g) => [g, String(ALVOS_PADRAO.series[g] ?? 0)]))); }}>Voltar aos padrões</Button>

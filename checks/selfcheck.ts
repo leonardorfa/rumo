@@ -953,3 +953,64 @@ console.log("extrato formato novo do C6 ok");
   assert.deepEqual(f.purchases.map((p) => p.date), ["2026-09-26", "2026-10-05"], "o pagamento da fatura não é compra");
 }
 console.log("fatura formato atual do C6 ok");
+
+// ---- 2026-11-15: treino livre, objetivos e exercícios de nome parecido ----
+{
+  const L = require("../lib/life") as typeof import("../lib/life");
+  const d0 = { txs: [], father: [], goals: [], config: DEFAULT_CONFIG, fit: undefined } as unknown as Data;
+
+  // treino livre não guarda nem devolve rascunho; treino de rotina guarda
+  assert.equal(L.rascunhoChave(undefined), null, "treino livre não tem rascunho");
+  assert.equal(L.rascunhoChave(""), null);
+  assert.equal(L.rascunhoChave("r1"), "treino-rascunho-r1");
+
+  // séries que faltam na semana (para o treino livre fechar)
+  let d = L.setAlvos(d0, { series: { Peito: 12, Costas: 12, Ombro: 0 } });
+  d = L.saveWorkout(d, { id: "", date: "2026-11-12", sets: [1, 2, 3, 4, 5].map(() => ({ ex: "Supino reto", kg: 40, reps: 10 })) });
+  const f = L.seriesFaltando(d, "2026-11-12");
+  assert.deepEqual(f.find((x) => x.grupo === "Peito"), { grupo: "Peito", alvo: 12, feito: 5, falta: 7 });
+  assert.ok(!f.some((x) => x.grupo === "Ombro"), "meta 0 não aparece");
+  assert.equal(L.seriesFaltando(d, "2026-11-20").find((x) => x.grupo === "Peito")?.falta, 12, "semana nova zera");
+
+  // objetivos: cada um muda cardio e séries; braços e abdômen são proporcionais
+  const cut = L.alvosOf(L.aplicarObjetivo(d0, "cutting"));
+  assert.deepEqual([cut.objetivo, cut.cardioMin, cut.series.Peito, cut.series.Tríceps, cut.series.Abdômen], ["cutting", 200, 10, 7, 5]);
+  const man = L.alvosOf(L.aplicarObjetivo(d0, "manutencao"));
+  assert.deepEqual([man.cardioMin, man.series.Peito, man.series.Bíceps], [150, 6, 5]);
+  assert.ok(L.alvosOf(L.aplicarObjetivo(d0, "bulking_sujo")).cardioMin < L.alvosOf(L.aplicarObjetivo(d0, "bulking_limpo")).cardioMin, "bulking sujo tem menos cardio que o limpo");
+  assert.equal(L.alvosOf(L.aplicarObjetivo(d0, "nao_existe")).objetivo, "recomposicao", "objetivo desconhecido não muda nada");
+  assert.ok(L.OBJETIVOS.length >= 6 && L.OBJETIVOS.every((o) => o.nota.length > 40), "cada objetivo explica de onde vêm os números");
+
+  // exercícios de nome parecido: perguntar, juntar e lembrar que são diferentes
+  assert.ok(L.exParecidos("Elevação anilha", "Elevação de ombro anilha"), "o exemplo do usuário");
+  assert.ok(L.exParecidos("Elevação lateral", "Elevação lateral com halter"));
+  assert.ok(!L.exParecidos("Supino reto", "Supino inclinado"), "variações diferentes não são parecidas");
+  assert.ok(!L.exParecidos("Remada", "Remada baixa"), "uma palavra só é pouco para afirmar");
+  assert.ok(!L.exParecidos("Tríceps corda", "Tríceps francês"));
+  let e = L.saveRoutine(d0, { id: "r", name: "Ombro", exercises: ["Elevação anilha", "Elevação de ombro anilha", "Leg press"] });
+  e = L.saveWorkout(e, { id: "", date: "2026-11-12", sets: [{ ex: "Elevação de ombro anilha", kg: 5, reps: 12 }, { ex: "Elevação anilha", kg: 4, reps: 12 }] });
+  assert.deepEqual(L.paresParecidos(e), [["Elevação anilha", "Elevação de ombro anilha"]]);
+  assert.deepEqual(L.parecidosCom(e, "Elevação ombro anilha").sort(), ["Elevação anilha", "Elevação de ombro anilha"]);
+  const dist = L.marcarDistintos(e, "Elevação anilha", "Elevação de ombro anilha");
+  assert.deepEqual(L.paresParecidos(dist), [], "depois de dizer que são diferentes, não pergunta mais");
+  assert.equal(L.parecidosCom(dist, "Elevação de ombro anilha").includes("Elevação anilha"), false);
+  const junto = L.juntarExercicios(e, "Elevação de ombro anilha", "Elevação anilha");
+  assert.deepEqual(L.fitOf(junto).routines[0].exercises, ["Elevação anilha", "Leg press"], "a rotina não repete o exercício");
+  assert.deepEqual(L.fitOf(junto).workouts[0].sets.map((s) => s.ex), ["Elevação anilha", "Elevação anilha"], "o histórico passa para o nome escolhido");
+  assert.deepEqual(L.paresParecidos(junto), []);
+}
+console.log("treino livre, objetivos e exercícios parecidos ok");
+
+// ---- regressões 2026-11-15 ----
+{
+  const fs = require("fs") as typeof import("fs");
+  const ui = fs.readFileSync("components/ui.tsx", "utf8");
+  // janela aberta: a página de trás rolava junto e a janela ficava torta no iPhone
+  assert.ok(/travarRolagem\(\)/.test(ui) && /position = "fixed"/.test(ui) && /soltarRolagem/.test(ui), "Sheet trava a rolagem da página de trás");
+  assert.ok(/overscroll-contain/.test(ui), "a janela não passa a rolagem para a página");
+  // treino livre voltava com exercícios de um rascunho antigo e salvava rascunho
+  const tr = fs.readFileSync("components/Treino.tsx", "utf8");
+  assert.ok(/rascunhoChave\(routineId\)/.test(tr) && !/treino-rascunho-\$\{routineId \?\? ""\}/.test(tr), "o rascunho vem de rascunhoChave (null no treino livre)");
+  assert.ok(/livre \? \[\]/.test(tr), "treino livre começa sem exercícios");
+}
+console.log("regressões de 15/11 ok");

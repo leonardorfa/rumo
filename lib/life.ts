@@ -494,7 +494,7 @@ export function buildAguaIcs(d: Data, now = new Date()): string {
  *   por semana por músculo, e Pelland et al. (2024, preprint) mostram retorno que cresce com o volume, cada vez menor.
  *   Bíceps e tríceps já trabalham nos exercícios de costas e peito, então precisam de menos séries diretas.
  */
-export const ALVOS_PADRAO = { cardioMin: 150, series: { Peito: 12, Costas: 12, Ombro: 12, Bíceps: 10, Tríceps: 8, Perna: 12, Abdômen: 6 } as Record<string, number> };
+export const ALVOS_PADRAO = { objetivo: "recomposicao" as string, cardioMin: 150, series: { Peito: 12, Costas: 12, Ombro: 12, Bíceps: 10, Tríceps: 8, Perna: 12, Abdômen: 6 } as Record<string, number> };
 export const alvosOf = (d: Data) => ({ ...ALVOS_PADRAO, ...fitOf(d).alvos, series: { ...ALVOS_PADRAO.series, ...(fitOf(d).alvos?.series ?? {}) } });
 export const setAlvos = (d: Data, patch: Partial<NonNullable<Fit["alvos"]>>): Data => setFit(d, { alvos: { ...alvosOf(d), ...patch } });
 
@@ -543,4 +543,95 @@ export function resumoDoDia(d: Data, iso: string, hoje = localDay()) {
 export function exerciciosDoTreino(w: Workout): { ex: string; sets: { kg: number; reps: number }[] }[] {
   const ordem = [...new Set([...w.sets.map((s) => s.ex), ...(w.pend ?? [])])];
   return ordem.map((ex) => ({ ex, sets: w.sets.filter((s) => s.ex === ex).map(({ kg, reps }) => ({ kg, reps })) }));
+}
+
+// ---------- treino livre ----------
+
+/** Onde guardar o rascunho de um treino não salvo. Treino livre (sem rotina) nunca guarda nem devolve rascunho. */
+export const rascunhoChave = (routineId?: string): string | null => (routineId ? `treino-rascunho-${routineId}` : null);
+
+/** Séries que ainda faltam na semana, por grupo muscular (o treino livre serve para fechar essas). */
+export function seriesFaltando(d: Data, hoje = localDay()) {
+  const al = alvosOf(d);
+  const feito = feitoNaSemana(d, hoje).series;
+  return Object.keys(al.series)
+    .map((grupo) => ({ grupo, alvo: al.series[grupo], feito: feito[grupo] ?? 0, falta: al.series[grupo] - (feito[grupo] ?? 0) }))
+    .filter((x) => x.alvo > 0 && x.falta > 0)
+    .sort((a, b) => b.falta - a.falta);
+}
+
+// ---------- objetivos (metas semanais por objetivo) ----------
+
+/**
+ * Cada objetivo muda os padrões de cardio e de séries. Base de séries é para peito, costas, ombro e perna;
+ * braços e abdômen são proporcionais. Fontes e limites das evidências estão em `nota`.
+ */
+export const OBJETIVOS = [
+  { key: "bulking_limpo", nome: "Ganhar massa, limpo (bulking limpo)", cardioMin: 90, base: 12,
+    nota: "Superávit pequeno (cerca de 5 a 10% acima da manutenção): ganha-se massa com menos gordura. Séries: 10 ou mais por músculo por semana dão mais ganho (Schoenfeld 2017), com retorno cada vez menor acima disso (Pelland 2024, preprint). Cardio leve, só para coração e condicionamento, sem queimar o superávit." },
+  { key: "bulking_sujo", nome: "Ganhar massa, sujo (bulking sujo)", cardioMin: 60, base: 14,
+    nota: "Superávit grande: sobe mais peso, inclusive gordura. Não há evidência de que mais de 20 séries por semana ajudem; o que muda é a comida. Fica com um volume um pouco maior e cardio mínimo, para não gastar o superávit. Cardio longo atrapalha um pouco o ganho de força e de massa (efeito de interferência, mais forte na corrida que na bicicleta)." },
+  { key: "cutting", nome: "Definição (cutting)", cardioMin: 200, base: 10,
+    nota: "Déficit de calorias. Estudos em déficit (Roth e Schoenfeld, 2022) não acharam que mais séries preservem mais massa magra; manter a carga pesada importa mais. Por isso um volume um pouco menor que no bulking (cerca de 20 a 30% a menos). Cardio: o ACSM liga 150 a 250 min por semana a perda de peso modesta, e mais de 250 a perda clinicamente relevante; aqui vai 200, e a dieta faz o resto." },
+  { key: "manutencao", nome: "Manter o que já tem", cardioMin: 150, base: 6,
+    nota: "Manter massa e força custa pouco: uma revisão (Spiering 2021) mostra que dá para manter por semanas com 1 treino por semana e poucas séries pesadas por exercício. Aqui, 4 a 6 séries por músculo por semana, perto da falha. Cardio de 150 min é o mínimo da OMS." },
+  { key: "recomposicao", nome: "Recomposição (perder gordura e ganhar músculo)", cardioMin: 150, base: 12,
+    nota: "Calorias perto da manutenção e proteína alta. Volume de ganho de massa (10 a 20 séries) e cardio de 150 min, o mínimo da OMS. Funciona melhor em quem é iniciante ou está voltando a treinar." },
+  { key: "saude", nome: "Saúde geral", cardioMin: 225, base: 6,
+    nota: "Diretriz da OMS (2020): 150 a 300 min de atividade aeróbica moderada por semana e fortalecimento muscular em 2 ou mais dias. Fica no meio da faixa de cardio (225 min) e com 6 séries por grupo." },
+] as const;
+const PROPORCAO: Record<string, number> = { Peito: 1, Costas: 1, Ombro: 1, Perna: 1, Bíceps: 0.8, Tríceps: 0.7, Abdômen: 0.5 };
+export const seriesDoObjetivo = (base: number): Record<string, number> =>
+  Object.fromEntries(Object.entries(PROPORCAO).map(([g, p]) => [g, Math.max(2, Math.round(base * p))]));
+/** Troca o objetivo e põe os padrões dele nas metas (depois você ainda pode ajustar cada número). */
+export function aplicarObjetivo(d: Data, key: string): Data {
+  const o = OBJETIVOS.find((x) => x.key === key);
+  return o ? setAlvos(d, { objetivo: o.key, cardioMin: o.cardioMin, series: seriesDoObjetivo(o.base) }) : d;
+}
+
+// ---------- exercícios com nome parecido ----------
+
+const PARADAS = new Set(["de", "do", "da", "dos", "das", "na", "no", "com", "e", "em", "a", "o", "para", "pelo", "pela"]);
+const tokensEx = (s: string) =>
+  norm(s).replace(/[^a-z0-9 ]/g, " ").split(/\s+/).map((w) => w.replace(/s$/, "")).filter((w) => w && !PARADAS.has(w));
+/** Um nome tem todas as palavras do outro (o menor com 2 ou mais palavras): "Elevação anilha" e "Elevação de ombro anilha". */
+export function exParecidos(a: string, b: string): boolean {
+  const A = new Set(tokensEx(a)), B = new Set(tokensEx(b));
+  const [p, g] = A.size <= B.size ? [A, B] : [B, A];
+  return p.size >= 2 && [...p].every((x) => g.has(x));
+}
+const chaveDistinto = (a: string, b: string) => [norm(a), norm(b)].sort().join("|");
+
+/** Exercícios que já existem (seus ou das sugestões) e parecem com `nome`, menos os que você já disse que são diferentes. */
+export function parecidosCom(d: Data, nome: string): string[] {
+  const dist = fitOf(d).exDistintos ?? [];
+  const todos = [...new Map([...knownExercises(d), ...SUGESTOES].map((e) => [norm(e), e])).values()];
+  return todos.filter((c) => norm(c) !== norm(nome) && exParecidos(nome, c) && !dist.includes(chaveDistinto(nome, c)));
+}
+/** Pares de exercícios seus com nome parecido, para você juntar ou dizer que são diferentes. */
+export function paresParecidos(d: Data): [string, string][] {
+  const dist = fitOf(d).exDistintos ?? [];
+  const ex = knownExercises(d);
+  const out: [string, string][] = [];
+  for (let i = 0; i < ex.length; i++) for (let j = i + 1; j < ex.length; j++)
+    if (exParecidos(ex[i], ex[j]) && !dist.includes(chaveDistinto(ex[i], ex[j]))) out.push([ex[i], ex[j]]);
+  return out;
+}
+export const marcarDistintos = (d: Data, a: string, b: string): Data =>
+  setFit(d, { exDistintos: [...new Set([...(fitOf(d).exDistintos ?? []), chaveDistinto(a, b)])] });
+/** Troca o nome `de` por `para` em rotinas, treinos já feitos, dias da semana e grupos. */
+export function juntarExercicios(d: Data, de: string, para: string): Data {
+  const f = fitOf(d);
+  const troca = (e: string) => (norm(e) === norm(de) ? para : e);
+  const unico = (xs: string[]) => [...new Map(xs.map((e) => [norm(e), e])).values()];
+  const grupos = { ...(f.exGroups ?? {}) };
+  const gde = Object.entries(grupos).find(([k]) => norm(k) === norm(de))?.[1];
+  for (const k of Object.keys(grupos)) if (norm(k) === norm(de)) delete grupos[k];
+  if (gde && !Object.keys(grupos).some((k) => norm(k) === norm(para))) grupos[para] = gde;
+  return setFit(d, {
+    routines: f.routines.map((r) => ({ ...r, exercises: unico(r.exercises.map(troca)) })),
+    workouts: f.workouts.map((w) => ({ ...w, sets: w.sets.map((s) => ({ ...s, ex: troca(s.ex) })), ...(w.pend ? { pend: unico(w.pend.map(troca)).filter((e) => !w.sets.some((s) => norm(s.ex) === norm(e))) } : {}) })),
+    dayExtra: Object.fromEntries(Object.entries(f.dayExtra ?? {}).map(([k, v]) => [k, v.extra ? { ...v, extra: unico(v.extra.map(troca)) } : v])),
+    exGroups: grupos,
+  });
 }

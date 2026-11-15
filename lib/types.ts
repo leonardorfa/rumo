@@ -131,6 +131,7 @@ export interface Agua {
   log: Record<string, number>; // dia -> ml bebidos
 }
 export interface Alvos {
+  objetivo?: string; // "bulking_limpo", "cutting"... ou "personalizado" (ver OBJETIVOS em life.ts)
   cardioMin: number; // minutos de cardio por semana
   series: Record<string, number>; // grupo muscular -> séries por semana
 }
@@ -161,6 +162,7 @@ export interface Fit {
   weights: { date: string; kg: number }[];
   days: Record<string, string>; // "0" domingo … "6" sábado → id da rotina ("" = treino sem rotina); ausente = descanso
   dayExtra?: Record<string, DayExtra>; // ajustes de cada dia (ênfase, tempo, cardio, exercícios a mais)
+  exDistintos?: string[]; // pares de exercícios de nome parecido que você disse que são diferentes ("a|b")
   exGroups?: Record<string, string>; // grupo muscular dos exercícios que você criou
   agua?: Agua; // meta de água e o que você bebeu
   alvos?: Alvos; // metas semanais de cardio e de séries por grupo muscular

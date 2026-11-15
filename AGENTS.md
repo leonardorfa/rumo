@@ -23,6 +23,8 @@ Leia também o `HANDOFF.md` (contexto e pendências) e o `README.md` (como rodar
 
 | Data | O que quebrou | Causa | Teste (em `checks/selfcheck.ts`) |
 |---|---|---|---|
+| 2026-11-15 | Com uma janela aberta, rolar fazia a página de trás rolar e a janela ficava torta (iPhone) | Nada travava a rolagem do `<body>` | "Sheet trava a rolagem da página de trás", "a janela não passa a rolagem para a página" |
+| 2026-11-15 | Treino livre voltava com exercícios de um rascunho antigo e salvava rascunho e exercícios sem série | O rascunho usava a mesma chave para todo treino sem rotina e o treino livre guardava `pend` | `rascunhoChave` (null no livre), "treino livre começa sem exercícios" e "treino livre, objetivos e exercícios parecidos" |
 | 2026-11-14 | Fatura do C6 sem total e sem vencimento, e o pagamento da fatura entrava como compra | A fatura atual traz "Data do vencimento: 01 de Novembro" (sem ano), o total como "Pagamento total" e o pagamento como "Inclusao de Pagamento" | "fatura formato atual do C6" |
 | 2026-11-14 | Extrato novo não atualizava o saldo da conta e ganhava uma entrada falsa com o valor do saldo | O C6 mudou o formato ("Saldo no dia da exportação" e "15/10/2026 a 14/11/2026 R$ …"); o leitor só conhecia "Saldo do dia •" e leu a linha do período como transação | "extrato formato novo do C6" (saldo, data, sem entrada falsa e limpeza de quem já importou) |
 | 2026-11-14 | Janela da senha do PDF aparecia no meio da página e escurecia só um cartão (iPhone) | A janela `fixed` ficava presa ao cartão animado | "Sheet precisa ir para o <body> (portal)" |

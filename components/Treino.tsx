@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { shareFile } from "@/lib/backup";
 import { localDay } from "@/lib/format";
 import {
-  agrupar, buildIcs, deleteRoutine, GRUPOS, grupoDaRotina, grupoDe, MODELOS, setExGroup, planForDay, setDayExtra, deleteWeight, deleteWorkout, exerciseHistory, fitOf, goalStatus, knownExercises, lastSets, logWeight,
+  rascunhoChave, seriesFaltando, parecidosCom, marcarDistintos, paresParecidos, juntarExercicios, agrupar, buildIcs, deleteRoutine, GRUPOS, grupoDaRotina, grupoDe, MODELOS, setExGroup, planForDay, setDayExtra, deleteWeight, deleteWorkout, exerciseHistory, fitOf, goalStatus, knownExercises, lastSets, logWeight,
   recordsOf, saveRoutine, saveWorkout, setTrainingDay, setTrainingTime, SUGESTOES, weekStats, weeklyVolume, weightTrend, WEEKDAYS,
 } from "@/lib/life";
 import { update, useData } from "@/lib/store";
@@ -78,6 +78,7 @@ function Hoje() {
             <div className="text-[22px] font-bold text-ok">✓ Treino de hoje feito</div>
             <div className="text-[13px] text-ink2">{[...new Set(feitoHoje.sets.map((s) => s.ex))].join(", ") || "sem exercícios"}{feitoHoje.cardio ? ` · ${feitoHoje.cardio.tipo} ${feitoHoje.cardio.min} min` : ""}</div>
             <Button className="w-full mt-3" onClick={() => setTreino({ w: feitoHoje })}>Ver ou editar</Button>
+            <Button className="w-full mt-2" onClick={() => comecar()}>Treino livre (fechar séries que faltam)</Button>
           </>
         ) : (
           <>
@@ -207,13 +208,17 @@ function TreinoSheet({ w, routineId, exercicios, onClose }: { w?: Workout; routi
   const [data, setData] = useState(w?.date ?? localDay());
   const [nota, setNota] = useState(w?.note ?? "");
   const [add, setAdd] = useState(false);
-  const chaveRascunho = `treino-rascunho-${routineId ?? ""}`;
+  const [grupoAdd, setGrupoAdd] = useState<string | undefined>(undefined);
+  // Treino livre (sem rotina) começa vazio e não guarda rascunho: serve para fechar séries que faltam.
+  const livre = !w && !routineId;
+  const chaveRascunho = rascunhoChave(routineId);
   const [blocos, setBlocos] = useState<Bloco[]>(() => {
     if (w) {
       const ex = [...new Set([...w.sets.map((s) => s.ex), ...(w.pend ?? [])])];
       return ex.map((e) => ({ ex: e, sets: w.sets.some((s) => s.ex === e) ? w.sets.filter((s) => s.ex === e).map((s) => ({ kg: String(s.kg).replace(".", ","), reps: String(s.reps) })) : preencher(d, e) }));
     }
     // treino começado e não salvo: volta como estava (o mesmo dia e a mesma rotina)
+    if (!chaveRascunho) return livre ? [] : (exercicios ?? []).map((e) => ({ ex: e, sets: preencher(d, e) }));
     try {
       const r = JSON.parse(localStorage.getItem(chaveRascunho) || "null") as { dia: string; blocos: Bloco[] } | null;
       if (r && r.dia === localDay() && r.blocos?.length) return r.blocos;
@@ -232,7 +237,7 @@ function TreinoSheet({ w, routineId, exercicios, onClose }: { w?: Workout; routi
     if (c) setCTipo(c.tipo);
   }
   useEffect(() => {
-    if (w) return;
+    if (w || !chaveRascunho) return;
     try { localStorage.setItem(chaveRascunho, JSON.stringify({ dia: localDay(), blocos })); } catch { /* sem storage */ }
   }, [blocos]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (i: number, j: number, p: Partial<Bloco["sets"][number]>) =>
@@ -243,8 +248,8 @@ function TreinoSheet({ w, routineId, exercicios, onClose }: { w?: Workout; routi
   function salvar() {
     const sets = blocos.flatMap((b) => b.sets.map((s) => ({ ex: b.ex, kg: parse(s.kg || "0"), reps: Math.round(parse(s.reps)) })).filter((s) => s.reps > 0 && Number.isFinite(s.kg)));
     if (!sets.length && !temCardio && !blocos.length) return;
-    try { localStorage.removeItem(chaveRascunho); } catch { /* ok */ }
-    const pend = blocos.filter((b) => !sets.some((s) => s.ex === b.ex)).map((b) => b.ex);
+    try { if (chaveRascunho) localStorage.removeItem(chaveRascunho); } catch { /* ok */ }
+    const pend = !rotId ? [] : blocos.filter((b) => !sets.some((s) => s.ex === b.ex)).map((b) => b.ex);
     const min = Math.round(parse(cMin));
     const cardio: Cardio | undefined = Number.isFinite(min) && min > 0 ? { tipo: cTipo.trim() || "Cardio", min } : undefined;
     const novo: Workout = { id: w?.id ?? "", date: data, routineId: rotId || undefined, note: nota.trim() || undefined, cardio, sets, pend };
@@ -301,7 +306,23 @@ function TreinoSheet({ w, routineId, exercicios, onClose }: { w?: Workout; routi
           </div>
         );
       })}
-      <Button className="w-full mb-3" onClick={() => setAdd(true)}>+ Exercício</Button>
+      {!rotId && !w && (() => {
+        const falta = seriesFaltando(d);
+        return falta.length > 0 ? (
+          <div className="card p-3 mb-3">
+            <div className="font-semibold">Séries que faltam na semana</div>
+            <div className="text-[12px] text-ink3 mb-2">Toque num grupo para escolher o exercício.</div>
+            <div className="flex flex-wrap gap-2">
+              {falta.map((x) => (
+                <button key={x.grupo} className="rounded-full bg-fill px-3 py-1.5 text-[14px]" onClick={() => { setGrupoAdd(x.grupo); setAdd(true); }}>
+                  {x.grupo} <b>{x.falta}</b>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null;
+      })()}
+      <Button className="w-full mb-3" onClick={() => { setGrupoAdd(undefined); setAdd(true); }}>+ Exercício</Button>
       <div className="card p-3 mb-3">
         <div className="font-semibold mb-2">Cardio</div>
         <div className="grid grid-cols-[1fr_96px] gap-2">
@@ -317,7 +338,7 @@ function TreinoSheet({ w, routineId, exercicios, onClose }: { w?: Workout; routi
         {w && <Button tone="danger" className="flex-1" onClick={() => { act("Treino apagado", (dd) => deleteWorkout(dd, w.id)); onClose(); }}>Apagar</Button>}
         <Button tone="primary" className="flex-[2]" disabled={!total && !temCardio && !blocos.length} onClick={salvar}>Salvar {total ? `· ${total} séries` : temCardio ? "· cardio" : ""}</Button>
       </div>
-      {add && <EscolherExercicio onPick={(ex) => { setBlocos([...blocos, { ex, sets: preencher(d, ex) }]); setAdd(false); }} onClose={() => setAdd(false)} />}
+      {add && <EscolherExercicio grupo={grupoAdd} onPick={(ex) => { setBlocos([...blocos, { ex, sets: preencher(d, ex) }]); setAdd(false); }} onClose={() => setAdd(false)} />}
     </Sheet>
   );
 }
@@ -328,17 +349,33 @@ function preencher(d: ReturnType<typeof useData>, ex: string): Bloco["sets"] {
   return u ? u.sets.map((s) => ({ kg: String(s.kg).replace(".", ","), reps: String(s.reps) })) : [1, 2, 3].map(() => ({ kg: "", reps: "" }));
 }
 
-function EscolherExercicio({ onPick, onClose }: { onPick: (ex: string) => void; onClose: () => void }) {
+function EscolherExercicio({ onPick, onClose, grupo }: { onPick: (ex: string) => void; onClose: () => void; grupo?: string }) {
   const d = useData();
   const [q, setQ] = useState("");
   const [gNovo, setGNovo] = useState("");
   const meus = knownExercises(d);
   const outros = SUGESTOES.filter((s) => !meus.some((m) => m.toLowerCase() === s.toLowerCase()));
-  const filtra = (xs: string[]) => xs.filter((x) => x.toLowerCase().includes(q.toLowerCase()));
+  const filtra = (xs: string[]) => xs.filter((x) => x.toLowerCase().includes(q.toLowerCase()) && (!grupo || grupoDe(d, x) === grupo));
+  const parecidos = q.trim() ? parecidosCom(d, q.trim()) : [];
   return (
     <Sheet open onClose={onClose} title="Exercício">
+      {grupo && <div className="text-[13px] text-ink3 px-1 mb-2">Mostrando só {grupo}.</div>}
       <input autoFocus placeholder="Buscar ou escrever um novo" value={q} onChange={(e) => setQ(e.target.value)} className="mb-3" />
-      {q.trim() && !meus.concat(outros).some((x) => x.toLowerCase() === q.trim().toLowerCase()) && (
+      {q.trim() && parecidos.length > 0 && !meus.concat(outros).some((x) => x.toLowerCase() === q.trim().toLowerCase()) && (
+        <div className="card p-3 mb-3">
+          <div className="font-semibold mb-1">“{q.trim()}” é o mesmo exercício que algum destes?</div>
+          {parecidos.map((p) => (
+            <div key={p} className="py-2 border-t border-line first:border-t-0">
+              <div className="mb-1.5">{p}</div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button tone="primary" className="!h-9" onClick={() => onPick(p)}>É o mesmo, usar este</Button>
+                <Button className="!h-9" onClick={() => update((dd) => marcarDistintos(dd, q.trim(), p))}>São diferentes</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {q.trim() && !parecidos.length && !meus.concat(outros).some((x) => x.toLowerCase() === q.trim().toLowerCase()) && (
         <div className="card p-3 mb-3">
           <div className="text-[13px] text-ink3 mb-1">Grupo muscular de “{q.trim()}”</div>
           <select value={gNovo || grupoDe(d, q.trim())} onChange={(e) => setGNovo(e.target.value)} className="mb-2">
@@ -528,6 +565,33 @@ function PorTreino() {
 
 // ---------- plano ----------
 
+/** Exercícios de nome parecido (de qualquer grupo): você escolhe juntar ou manter separados. */
+function ParecidosCard() {
+  const d = useData();
+  const pares = paresParecidos(d);
+  if (!pares.length) return null;
+  return (
+    <>
+      <Section>Nomes parecidos</Section>
+      <div className="text-[13px] text-ink3 px-1 mb-2">Estes exercícios têm nomes parecidos. Se forem o mesmo, junte: o histórico e as rotinas passam para um só nome.</div>
+      <div className="flex flex-col gap-3">
+        {pares.slice(0, 6).map(([a, b]) => (
+          <Card key={a + b}>
+            <div className="text-[15px]">{a}</div>
+            <div className="text-[15px] text-ink2">{b}</div>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <Button tone="primary" className="!h-9" onClick={() => act(`Juntei em “${a}”`, (dd) => juntarExercicios(dd, b, a))}>Juntar em “{a.length > 14 ? a.slice(0, 13) + "…" : a}”</Button>
+              <Button className="!h-9" onClick={() => act("Mantive separados", (dd) => marcarDistintos(dd, a, b))}>São diferentes</Button>
+            </div>
+            <button className="text-link text-[13px] font-semibold mt-2" onClick={() => act(`Juntei em “${b}”`, (dd) => juntarExercicios(dd, a, b))}>Ou juntar em “{b}”</button>
+          </Card>
+        ))}
+        {pares.length > 6 && <div className="text-[12px] text-ink3 px-1">Mais {pares.length - 6} depois que você resolver estes.</div>}
+      </div>
+    </>
+  );
+}
+
 const resumoRotina = (r: Routine) =>
   [r.focus && `ênfase ${r.focus}`, r.minutes && `${r.minutes} min`, r.cardio && `${r.cardio.tipo} ${r.cardio.min} min`, `${r.exercises.length} exercício${r.exercises.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
 
@@ -562,6 +626,8 @@ function Plano() {
         })}
       </div>
       <p className="text-[13px] text-ink3 px-1 mt-2">Toque num dia para mudar entre descanso e treino e escolher a rotina.</p>
+
+      <ParecidosCard />
 
       <Section>Rotinas</Section>
       <div className="card px-4">
