@@ -125,7 +125,7 @@ function Hoje() {
               <div key={x.data} className="flex flex-col items-center gap-1">
                 <span className={`text-[11px] ${x.hoje ? "text-link font-bold" : "text-ink3"}`}>{ini}</span>
                 <span className={`w-9 h-9 rounded-full grid place-items-center text-[14px] font-semibold ${
-                  estado === "feito" ? "bg-ok text-white" : estado === "perdido" ? "border-2 border-alert text-alert" : estado === "falta" ? "border-2 border-meu text-meu" : "bg-fill text-ink3"}`}>
+                  estado === "feito" ? "bg-ok text-[#031a14]" : estado === "perdido" ? "border-2 border-alert text-alert" : estado === "falta" ? "border-2 border-meu text-meu" : "bg-fill text-ink3"}`}>
                   {estado === "feito" ? "✓" : estado === "perdido" ? "×" : x.data.slice(8)}
                 </span>
               </div>

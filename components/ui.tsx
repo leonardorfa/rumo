@@ -87,14 +87,14 @@ export function Segmented<T extends string>({ value, options, onChange }: {
   value: T; options: { value: T; label: string }[]; onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex bg-fill rounded-[10px] p-[2px] text-[13px] font-medium" role="tablist">
+    <div className="flex bg-fill border border-line rounded-[12px] p-[2px] text-[13px] font-medium" role="tablist">
       {options.map((o) => (
         <button
           key={o.value}
           role="tab"
           aria-selected={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`flex-auto px-2 whitespace-nowrap py-[7px] rounded-[8px] transition-colors ${o.value === value ? "bg-card text-ink shadow-sm font-semibold" : "text-ink2"}`}
+          className={`flex-auto px-2 whitespace-nowrap py-[7px] rounded-[8px] transition-colors ${o.value === value ? "seg-on font-semibold" : "text-ink2"}`}
         >
           {o.label}
         </button>
@@ -116,7 +116,7 @@ export function Progress({ value, max, color = "var(--meu)" }: { value: number; 
   }, [pct, anim]);
   return (
     <div className="h-2 rounded-full bg-fill overflow-hidden" role="progressbar" aria-valuenow={Math.round(pct)}>
-      <div className="h-full rounded-full" style={{ width: `${w}%`, background: over ? "var(--alert)" : color, transition: anim ? "width .9s cubic-bezier(.2,.8,.2,1)" : undefined }} />
+      <div className="h-full rounded-full" style={{ width: `${w}%`, background: over ? "var(--alert)" : `linear-gradient(90deg, ${color}, color-mix(in srgb, ${color} 55%, var(--s1)))`, boxShadow: `0 0 10px color-mix(in srgb, ${over ? "var(--alert)" : color} 50%, transparent)`, transition: anim ? "width .9s cubic-bezier(.2,.8,.2,1)" : undefined }} />
     </div>
   );
 }
@@ -135,7 +135,7 @@ export function MonthSwitcher({ month, onChange, max }: { month: string; onChang
 export function Button({ children, onClick, tone = "fill", className = "", disabled }: {
   children: React.ReactNode; onClick?: () => void; tone?: "fill" | "primary" | "danger"; className?: string; disabled?: boolean;
 }) {
-  const t = tone === "primary" ? "bg-brand text-onbrand" : tone === "danger" ? "bg-fill text-alert" : "bg-fill text-link";
+  const t = tone === "primary" ? "btn-primary" : tone === "danger" ? "bg-fill text-alert btn-soft" : "bg-fill text-link btn-soft";
   return (
     <button disabled={disabled} onClick={onClick} className={`h-11 px-4 rounded-xl font-semibold disabled:opacity-40 ${t} ${className}`}>
       {children}
@@ -234,7 +234,7 @@ export function Sheet({ open, onClose, title, children }: {
         if (/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
       }}>
       <div className="sheet-scrim absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="sheet-in relative w-full max-w-[480px] overflow-y-auto overscroll-contain bg-bg rounded-t-3xl px-4 pt-2"
+      <div className="sheet-in relative w-full max-w-[480px] overflow-y-auto overscroll-contain rounded-t-3xl px-4 pt-2"
         style={{ maxHeight: vv ? `${Math.min(vv.h - 8, vv.h * 0.94)}px` : "88vh", paddingBottom: "calc(20px + env(safe-area-inset-bottom))" }}>
         <div className="mx-auto mt-1 mb-3 h-1.5 w-10 rounded-full bg-line" />
         <div className="flex items-center justify-between mb-3">

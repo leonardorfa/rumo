@@ -14,6 +14,7 @@ import { parseStatementText } from "@/lib/text-parser";
 import type { Bill, Config } from "@/lib/types";
 import { exportCsv, restoreFile, saveBackup } from "@/lib/backup";
 import { brl, localDay } from "@/lib/format";
+import { CHAVE_ABERTURA } from "./Abertura";
 import { Button, Card, FilePick, Money, Section, Segmented, Sheet, Title, toast } from "./ui";
 
 const PW_KEY = "pdf-password";
@@ -366,6 +367,7 @@ function Settings({ cfg, goCdb }: { cfg: Config; goCdb: () => void }) {
         <Row label="Fatura do cartão em aberto desconta do meu dinheiro" sub={p.countInvoices ? "ligado: a fatura importada e não paga sai do disponível" : "desligado: a fatura não mexe em nada (o pagamento aparece no extrato)"} value={p.countInvoices ? "sim" : "não"} onClick={() => setP({ countInvoices: !p.countInvoices })} />
         <Row label="Atualizar cotações ao abrir Cripto" sub="consulta a Coinbase e envia só o símbolo da moeda (SOL, BTC…)" value={p.autoCotacao ? "sim" : "não"} onClick={() => setP({ autoCotacao: !p.autoCotacao })} />
         <Row label="Cripto conta no meu dinheiro" value={p.countCripto ? "sim" : "não"} onClick={() => setP({ countCripto: !p.countCripto })} />
+        <Row label="Animação de abertura (planeta e órbita)" value={p.splash ? "sim" : "não"} onClick={() => { setP({ splash: !p.splash }); try { localStorage.setItem(CHAVE_ABERTURA, !p.splash ? "1" : "0"); } catch { /* ok */ } }} />
         <Row label="Animações e gráficos 3D" value={p.anim ? "sim" : "não"} onClick={() => setP({ anim: !p.anim })} />
         <Row label="Data de nascimento" value={p.birth ? new Date(p.birth + "T12:00:00").toLocaleDateString("pt-BR") : "informar"} onClick={() => setForm({
           title: "Data de nascimento", fields: [{ key: "v", label: "Para as metas “até os X anos”", kind: "date", value: p.birth }],

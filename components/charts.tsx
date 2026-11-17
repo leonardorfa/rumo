@@ -3,7 +3,7 @@
 import { useContext, useEffect, useState } from "react";
 import { animOn, useAnim } from "@/lib/anim";
 import {
-  Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, Pie, PieChart,
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { brl, brl0 } from "@/lib/format";
@@ -11,7 +11,7 @@ import { HideCtx } from "./ui";
 
 const axis = { fill: "var(--ink3)", fontSize: 11 };
 const tip = {
-  contentStyle: { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, fontSize: 13, color: "var(--ink)" },
+  contentStyle: { background: "var(--sheet)", border: "1px solid var(--line)", borderRadius: 12, fontSize: 13, color: "var(--ink)", boxShadow: "0 10px 30px rgba(0,0,0,.35)" },
   labelStyle: { color: "var(--ink2)" },
   // sem isso a biblioteca pinta o texto de preto (#000) quando a fatia ou a coluna não tem cor própria: some no escuro
   itemStyle: { color: "var(--ink)" },
@@ -21,6 +21,20 @@ const short = (v: number) =>
 
 /** Cores de série (validadas para daltonismo), em ordem fixa. */
 export const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)"];
+
+/** Degradês das colunas: a cor cheia no topo e mais suave embaixo (como nos gráficos da referência). */
+function gradientesDefs() {
+  return (
+    <defs>
+      {SERIES.map((c, i) => (
+        <linearGradient key={i} id={`gb${i}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" style={{ stopColor: c, stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: c, stopOpacity: 0.35 }} />
+        </linearGradient>
+      ))}
+    </defs>
+  );
+}
 
 export interface CatDatum { key: string; name: string; icon: string; value: number }
 
@@ -32,13 +46,14 @@ export function CategoryBars({ data, onSelect }: { data: CatDatum[]; onSelect?: 
     <div className="h-52 -ml-2">
       <ResponsiveContainer>
         <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barCategoryGap="22%">
-          <CartesianGrid vertical={false} stroke="var(--line)" />
+          {gradientesDefs()}
+          <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
           <XAxis dataKey="icon" tick={{ fontSize: 16, fill: "var(--ink2)" }} tickLine={false} axisLine={false} interval={0} />
           <YAxis tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 42} tickFormatter={short} />
           {!hidden && <Tooltip {...tip} cursor={{ fill: "var(--fill)" }} formatter={(v: number, _n, p) => [brl(v), (p?.payload as CatDatum)?.name]} labelFormatter={() => ""} />}
           <Bar dataKey="value" radius={[6, 6, 0, 0]} isAnimationActive={animOn()} animationDuration={900} cursor="pointer"
             onClick={(d: { key?: string }) => d?.key && onSelect?.(d.key)}>
-            {data.map((d, i) => <Cell key={d.key} fill={SERIES[i % SERIES.length]} />)}
+            {data.map((d, i) => <Cell key={d.key} fill={`url(#gb${i % SERIES.length})`} />)}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -52,25 +67,29 @@ export function CategoryDonut({ data, onSelect }: { data: CatDatum[]; onSelect?:
   const total = data.reduce((s, d) => s + d.value, 0);
   if (!total) return <p className="text-[13px] text-ink3">Sem gastos no mês.</p>;
   return (
-    <div>
-      <div className="h-36">
+    <div className="grid grid-cols-[136px_1fr] gap-3 items-center">
+      <div className="h-36 relative">
         <ResponsiveContainer>
           <PieChart>
             {!hidden && <Tooltip {...tip} formatter={(v: number, _n, p) => [brl(v), (p?.payload as CatDatum)?.name]} />}
-            <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="100%" paddingAngle={2}
-              stroke="var(--card)" strokeWidth={2} isAnimationActive={animOn()} animationDuration={900}
+            <Pie data={data} dataKey="value" nameKey="name" innerRadius="66%" outerRadius="100%" paddingAngle={3} cornerRadius={4}
+              stroke="none" isAnimationActive={animOn()} animationDuration={900}
               onClick={(d: { key?: string }) => d?.key && onSelect?.(d.key)}>
               {data.map((d, i) => <Cell key={d.key} fill={SERIES[i % SERIES.length]} cursor="pointer" />)}
             </Pie>
           </PieChart>
         </ResponsiveContainer>
+        <div className="absolute inset-0 grid place-content-center text-center pointer-events-none">
+          <span className="text-[11px] text-ink3">Total</span>
+          <span className="num text-[15px] font-bold">{hidden ? "••••" : brl0(total)}</span>
+        </div>
       </div>
-      <ul className="mt-2 flex flex-col gap-1">
+      <ul className="flex flex-col gap-1.5 min-w-0">
         {data.map((d, i) => (
           <li key={d.key} className="flex items-center gap-2 text-[13px]">
-            <i className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: SERIES[i % SERIES.length] }} />
+            <i className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: SERIES[i % SERIES.length], boxShadow: `0 0 8px ${SERIES[i % SERIES.length]}` }} />
             <span className="flex-1 truncate text-ink2">{d.name}</span>
-            <span className="text-ink3">{Math.round((d.value / total) * 100)}%</span>
+            <span className="text-ink font-semibold">{Math.round((d.value / total) * 100)}%</span>
           </li>
         ))}
       </ul>
@@ -91,8 +110,14 @@ export function CumulativeChart({ data, teto, labels }: {
       </div>
       <div className="h-44 -ml-2">
         <ResponsiveContainer>
-          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-            <CartesianGrid vertical={false} stroke="var(--line)" />
+          <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id="g-acum" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" style={{ stopColor: "var(--meu)", stopOpacity: 0.45 }} />
+                <stop offset="100%" style={{ stopColor: "var(--meu)", stopOpacity: 0 }} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
             <XAxis dataKey="day" tick={axis} tickLine={false} axisLine={false} ticks={[1, 10, 20, 30]} />
             <YAxis tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 44} tickFormatter={short} />
             {!hidden && (
@@ -104,10 +129,64 @@ export function CumulativeChart({ data, teto, labels }: {
                 label={{ value: hidden ? "Teto" : `Teto ${brl0(teto)}`, position: "insideTopRight", fill: "var(--alert)", fontSize: 11 }} />
             )}
             <Line dataKey="anterior" stroke="var(--ink3)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls={false} isAnimationActive={animOn()} animationDuration={900} />
-            <Line dataKey="atual" stroke="var(--meu)" strokeWidth={2.5} dot={false} connectNulls={false} isAnimationActive={animOn()} animationDuration={900} />
-          </LineChart>
+            <Area type="monotone" dataKey="atual" stroke="var(--meu)" strokeWidth={2.5} fill="url(#g-acum)" dot={false} connectNulls={false} isAnimationActive={animOn()} animationDuration={900} />
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
+    </div>
+  );
+}
+
+/** Fluxo de caixa do mês: entradas e saídas acumuladas dia a dia, em áreas de degradê. */
+export function FluxoChart({ data }: { data: { day: number; entradas: number; saidas: number }[] }) {
+  const hidden = useContext(HideCtx);
+  return (
+    <div>
+      <div className="flex gap-4 text-[13px] text-ink2 mb-1">
+        <span className="flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--s3)", boxShadow: "0 0 8px var(--s3)" }} />Entradas</span>
+        <span className="flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--s2)", boxShadow: "0 0 8px var(--s2)" }} />Saídas</span>
+      </div>
+      <div className="h-44 -ml-2">
+        <ResponsiveContainer>
+          <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <defs>
+              {[["ent", "var(--s3)"], ["sai", "var(--s2)"]].map(([id, c]) => (
+                <linearGradient key={id} id={`g-${id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" style={{ stopColor: c, stopOpacity: 0.5 }} />
+                  <stop offset="100%" style={{ stopColor: c, stopOpacity: 0 }} />
+                </linearGradient>
+              ))}
+            </defs>
+            <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
+            <XAxis dataKey="day" tick={axis} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={26} />
+            <YAxis tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 44} tickFormatter={short} />
+            {!hidden && <Tooltip {...tip} labelFormatter={(d) => `Dia ${d}`} formatter={(v: number, k) => [brl(v), k === "entradas" ? "Entradas" : "Saídas"]} />}
+            <Area type="monotone" dataKey="entradas" stroke="var(--s3)" strokeWidth={2.4} fill="url(#g-ent)" dot={false} isAnimationActive={animOn()} animationDuration={900} />
+            <Area type="monotone" dataKey="saidas" stroke="var(--s2)" strokeWidth={2.4} fill="url(#g-sai)" dot={false} isAnimationActive={animOn()} animationDuration={900} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+/** Mini gráfico sem eixos para os cartões de destaque. */
+export function Spark({ data, color = "var(--s1)", id }: { data: number[]; color?: string; id: string }) {
+  if (data.length < 2) return <div className="h-10" />;
+  return (
+    <div className="h-10 -mx-1" aria-hidden>
+      <ResponsiveContainer>
+        <AreaChart data={data.map((v, i) => ({ i, v }))} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id={`sp-${id}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.5 }} />
+              <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
+            </linearGradient>
+          </defs>
+          <YAxis hide domain={["dataMin", "dataMax"]} />
+          <Area type="monotone" dataKey="v" baseValue="dataMin" stroke={color} strokeWidth={2} fill={`url(#sp-${id})`} dot={false} isAnimationActive={animOn()} animationDuration={900} />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -120,7 +199,7 @@ export function ProjectionChart({ data, goal, name = "Saldo projetado" }: { data
     <div className="h-52 -ml-2">
       <ResponsiveContainer>
         <LineChart data={data} margin={{ top: 16, right: 12, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke="var(--line)" />
+          <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
           <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} />
           <YAxis domain={[0, max]} tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 44} tickFormatter={short} />
           {!hidden && <Tooltip {...tip} formatter={(v: number) => [brl(v), name]} />}
@@ -142,7 +221,7 @@ export function ForecastChart({ data }: { data: { label: string; value: number }
     <div className="h-44 -ml-2">
       <ResponsiveContainer>
         <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke="var(--line)" />
+          <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
           <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval={6} />
           <YAxis domain={[min, "auto"]} tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 44} tickFormatter={short} />
           {!hidden && <Tooltip {...tip} formatter={(v: number) => [brl(v), "Seu na conta"]} />}
@@ -162,7 +241,7 @@ export function FatherChart({ data }: { data: { label: string; value: number }[]
     <div className="h-36 -ml-2">
       <ResponsiveContainer>
         <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke="var(--line)" />
+          <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
           <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
           <YAxis tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 44} tickFormatter={short} />
           {!hidden && <Tooltip {...tip} formatter={(v: number) => [brl(v), "Crédito do pai"]} />}
@@ -188,7 +267,7 @@ export function TrendChart({ data, goal, name, fmt, goalLabel, dom }: {
     <div className="h-48 -ml-2">
       <ResponsiveContainer>
         <LineChart data={data} margin={{ top: 12, right: 12, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke="var(--line)" />
+          <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
           <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
           <YAxis domain={dom ?? [Math.floor(lo - pad), Math.ceil(hi + pad)]} tick={hidden ? false : axis} tickLine={false} axisLine={false}
             width={hidden ? 4 : 46} tickFormatter={(v: number) => (Math.abs(v) >= 1000 ? short(v) : String(v))} />
@@ -213,7 +292,7 @@ export function BarsChart({ data, name, color = "var(--meu)" }: { data: { label:
     <div className="h-40 -ml-2">
       <ResponsiveContainer>
         <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barCategoryGap="25%">
-          <CartesianGrid vertical={false} stroke="var(--line)" />
+          <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
           <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval="preserveStartEnd" />
           <YAxis tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 40} tickFormatter={(v: number) => (v >= 1000 ? short(v) : String(v))} allowDecimals={false} />
           {!hidden && <Tooltip {...tip} cursor={{ fill: "var(--fill)" }} formatter={(v: number) => [v.toLocaleString("pt-BR"), name]} />}

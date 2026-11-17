@@ -17,12 +17,15 @@ Leia também o `HANDOFF.md` (contexto e pendências) e o `README.md` (como rodar
 - Publicar com `npm run publicar` (GitHub Pages, endereço com prefixo `/rumo`). O Netlify não é mais usado.
 - Sem caminhos absolutos para arquivos (`/fonts/...`): usar o prefixo `NEXT_PUBLIC_BASE_PATH`.
 - Janelas (`Sheet`) vão para o `<body>` por portal; nunca prender uma janela fixa dentro de um cartão com animação.
+- Visual (nov/2026): vidro escuro com brilho. Cores e vidros ficam em tokens em `app/globals.css` (`--card-glass`, `--line`, `--s1` a `--s6`); gráficos usam `<defs>` direto dentro do Recharts; a abertura do app (`components/Abertura.tsx`) respeita "reduzir movimento" e a preferência em Mais.
 - Antes de publicar: `npm run check` e `npm run build`.
 
 ## Registro de regressões
 
 | Data | O que quebrou | Causa | Teste (em `checks/selfcheck.ts`) |
 |---|---|---|---|
+| 2026-11-16 | Colunas do gráfico de categorias ficaram invisíveis no visual novo | Os degradês estavam dentro de um componente próprio e o Recharts ignora filhos desconhecidos (o `fill="url(#...)"` apontava para nada) | "defs dos gráficos não podem estar dentro de um componente" |
+| 2026-11-16 | Marca de "feito" branca sobre o verde-água claro do tema escuro quase não aparecia | `bg-ok text-white` com a nova cor `--ok` | "bg-ok com texto branco" |
 | 2026-11-15 | Com uma janela aberta, rolar fazia a página de trás rolar e a janela ficava torta (iPhone) | Nada travava a rolagem do `<body>` | "Sheet trava a rolagem da página de trás", "a janela não passa a rolagem para a página" |
 | 2026-11-15 | Treino livre voltava com exercícios de um rascunho antigo e salvava rascunho e exercícios sem série | O rascunho usava a mesma chave para todo treino sem rotina e o treino livre guardava `pend` | `rascunhoChave` (null no livre), "treino livre começa sem exercícios" e "treino livre, objetivos e exercícios parecidos" |
 | 2026-11-14 | Fatura do C6 sem total e sem vencimento, e o pagamento da fatura entrava como compra | A fatura atual traz "Data do vencimento: 01 de Novembro" (sem ano), o total como "Pagamento total" e o pagamento como "Inclusao de Pagamento" | "fatura formato atual do C6" |

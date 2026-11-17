@@ -31,6 +31,7 @@ const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
 
 export default function App() {
   const d = useData();
+  useEffect(() => { try { localStorage.setItem("orbita-splash", d.config.prefs.splash === false ? "0" : "1"); } catch { /* ok */ } }, [d.config.prefs.splash]);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<Tab>("home");
   const [month, setMonth] = useState("");
@@ -111,14 +112,15 @@ export default function App() {
       {!empty && <AcoesFab onNovo={() => setNovo(true)} />}
       <NewTx open={novo} onClose={() => setNovo(false)} />
 
-      <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-line backdrop-blur-xl"
-        style={{ background: "color-mix(in srgb, var(--card) 88%, transparent)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-        <div className="mx-auto max-w-[480px] grid grid-cols-7 px-0.5 pt-1.5 pb-1">
+      <nav className="fixed bottom-0 inset-x-0 z-40 px-3 pointer-events-none" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
+        <div className="pointer-events-auto mx-auto max-w-[456px] grid grid-cols-7 px-1 py-1 rounded-[26px] border border-line backdrop-blur-xl"
+          style={{ background: "color-mix(in srgb, var(--card) 82%, transparent)", boxShadow: "0 14px 40px rgba(0,0,0,.35), 0 0 26px rgba(56,130,255,.12)" }}>
           {TABS.map((t) => {
             const on = tab === t.id;
             return (
               <button key={t.id} onClick={() => go(t.id)} aria-current={on ? "page" : undefined}
-                className={`flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-[10px] font-semibold transition-colors ${on ? "text-link bg-fill" : "text-ink3"}`}>
+                className={`flex flex-col items-center gap-0.5 py-1.5 rounded-[20px] text-[10px] font-semibold transition-colors ${on ? "text-link" : "text-ink3"}`}
+                style={on ? { background: "linear-gradient(160deg, rgba(100,150,255,.26), rgba(100,150,255,.08))", boxShadow: "0 0 18px rgba(80,150,255,.28), 0 0 0 1px rgba(130,180,255,.35) inset" } : undefined}>
                 {t.icon}
                 {t.label}
               </button>

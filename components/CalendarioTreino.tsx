@@ -47,7 +47,7 @@ export default function CalendarioTreino({ onClose, onEditar }: { onClose: () =>
           return (
             <button key={iso} onClick={() => setDia(iso)} aria-label={`${dataBR(iso)}: ${estado}`}
               className={`relative h-11 rounded-full grid place-items-center text-[14px] font-semibold ${
-                estado === "feito" ? "bg-ok text-white" : estado === "perdido" ? "border-2 border-alert text-alert" : estado === "falta" ? "border-2 border-meu text-meu" : "bg-fill text-ink2"
+                estado === "feito" ? "bg-ok text-[#031a14]" : estado === "perdido" ? "border-2 border-alert text-alert" : estado === "falta" ? "border-2 border-meu text-meu" : "bg-fill text-ink2"
               } ${sel ? "ring-2 ring-offset-2 ring-[var(--ink)]" : ""} ${x.hoje ? "underline underline-offset-4" : ""}`}>
               {iso.slice(8).replace(/^0/, "")}
               {x.aguaMl > 0 && <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-[var(--s1)]" aria-hidden />}

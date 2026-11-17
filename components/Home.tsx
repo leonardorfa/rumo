@@ -5,12 +5,13 @@ import { catIcon, catName } from "@/lib/categories";
 import { brl, brl0, daysInMonth, monthName, shiftMonth } from "@/lib/format";
 import { computeScenarios } from "@/lib/projections";
 import { typeOf } from "@/lib/categories";
-import { byCategory, cumulative, envelopes, isMyVariableSpend, ofMonth, variableSpend } from "@/lib/stats";
+import { byCategory, cumulative, envelopes, fluxoDoMes, isMyVariableSpend, ofMonth, variableSpend } from "@/lib/stats";
 import { billPaid, categoryTable, priceChanges, recurringSuggestions, safeToSpend } from "@/lib/insights";
 import { saveBackup } from "@/lib/backup";
 import { billActive, cdbNet, changesSinceBackup, fatherPending, moneyParts, cdbPerDay, dismissRecurring, fatherBalance, monthKey, myMoney, parcela, projectionInput, toggleBillPaid, update, useData } from "@/lib/store";
 import type { Data, Tx } from "@/lib/types";
-import { Bars3D, CategoryBars, CategoryDonut, CumulativeChart, type CatDatum } from "./charts";
+import { cdbRende, cdbSerie } from "@/lib/cdb";
+import { Bars3D, CategoryBars, CategoryDonut, CumulativeChart, FluxoChart, Spark, type CatDatum } from "./charts";
 import { noLucroAlvo, posicao } from "@/lib/cripto";
 import { TxList, TxRow, TxSheet } from "./Tx";
 import Revisar from "./Revisar";
@@ -64,6 +65,11 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
   }, [monthTxs, customs]);
 
   const tabela = useMemo(() => categoryTable(d.txs, month), [d.txs, month]);
+  const fluxo = useMemo(() => fluxoDoMes(d.txs, month, isNow), [d.txs, month, isNow]);
+  const fluxoAnt = useMemo(() => fluxoDoMes(d.txs, prev, false), [d.txs, prev]);
+  const pctVs = (a: number, b: number) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
+  const cdbMes = useMemo(() => { try { return cdbRende(d)[2]?.liquido ?? 0; } catch { return 0; } }, [d]);
+  const cdbSpark = useMemo(() => { try { return cdbSerie(d).slice(-30).map((s) => s.bruto); } catch { return []; } }, [d]);
   const abrirCat = (k: string) => (k === "__outros" ? setTodas(true) : setCat(k));
   const livre = isNow ? safeToSpend(d, teto) : null;
   const alteracoes = changesSinceBackup();
@@ -112,14 +118,14 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
         <SplitBar account={account} pai={pai} />
 
         <div className="grid grid-cols-2 gap-3 mt-4 text-left">
-          <div className="rounded-xl bg-white/10 p-3">
+          <div className="rounded-2xl bg-white/[.07] border border-white/[.14] p-3">
             <div className="text-[12px] text-white/70">Disponível agora</div>
             <Money v={parts.disponivel} className="font-bold" />
             <div className="text-[12px] text-white/70">
               na conta, só seu{parts.fatura > 0 ? <>, já sem a fatura de <Money v={parts.fatura} /></> : ""}
             </div>
           </div>
-          <button onClick={goCdb} className="rounded-xl bg-white/10 p-3 text-left block w-full min-w-0">
+          <button onClick={goCdb} className="rounded-2xl bg-white/[.07] border border-white/[.14] p-3 text-left block w-full min-w-0">
             <div className="text-[12px] text-white/70">CDB {d.config.cdb.pctCdi ? `· ${d.config.cdb.pctCdi}% CDI` : ""}</div>
             <Money v={cdb.liquido} className="font-bold" />
             <div className="text-[12px] text-white/70">
@@ -132,21 +138,21 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
             )}
           </button>
           {parts.cripto > 0 && (
-            <button onClick={goCdb} className="rounded-xl bg-white/10 p-3 col-span-2 text-left">
+            <button onClick={goCdb} className="rounded-2xl bg-white/[.07] border border-white/[.14] p-3 col-span-2 text-left">
               <div className="text-[12px] text-white/70">Cripto</div>
               <Money v={parts.cripto} className="font-bold" />
               <div className="text-[12px] text-white/70">valor das moedas pelo último preço anotado</div>
             </button>
           )}
           {parts.paiGuardado > 0 && (
-            <button onClick={goPai} className="rounded-xl bg-white/10 p-3 col-span-2 text-left">
+            <button onClick={goPai} className="rounded-2xl bg-white/[.07] border border-white/[.14] p-3 col-span-2 text-left">
               <div className="text-[12px] text-white/70">Você deve ao seu pai</div>
               <Money v={parts.paiGuardado} className="font-bold" />
               <div className="text-[12px] text-white/70">está na sua conta, mas é dele: fica fora do total</div>
             </button>
           )}
           {parts.aReceber > 0 && (
-            <div className="rounded-xl bg-white/10 p-3 col-span-2">
+            <div className="rounded-2xl bg-white/[.07] border border-white/[.14] p-3 col-span-2">
               <div className="text-[12px] text-white/70">A receber</div>
               <Money v={parts.aReceber} className="font-bold" />
               <div className="text-[12px] text-white/70">
@@ -221,6 +227,32 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
         </Card>
       )}
 
+      {/* destaques do mês, no estilo dos painéis: ícone com brilho, valor, variação e mini gráfico */}
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <StatCard id="gastos" cor="var(--s2)" label={`Gastos em ${monthName(month).toLowerCase()}`} valor={fluxo.saidas} delta={pctVs(fluxo.saidas, fluxoAnt.saidas)} bomSeSobe={false}
+          spark={fluxo.dias.map((x) => x.saidas)} icone={<path d="M12 5v14M6 13l6 6 6-6" />} />
+        <StatCard id="entradas" cor="var(--s3)" label="Entradas do mês" valor={fluxo.entradas} delta={pctVs(fluxo.entradas, fluxoAnt.entradas)} bomSeSobe
+          spark={fluxo.dias.map((x) => x.entradas)} icone={<path d="M12 19V5M6 11l6-6 6 6" />} />
+        <StatCard id="sobra" cor="var(--s1)" label="Sobra do mês" valor={fluxo.sobra} signed delta={pctVs(fluxo.sobra, fluxoAnt.sobra)} bomSeSobe
+          spark={fluxo.dias.map((x) => x.entradas - x.saidas)} icone={<path d="M5 20V10M12 20V4M19 20v-7" />} />
+        <StatCard id="cdbmes" cor="var(--s4)" label="CDB rende por mês" valor={cdbMes} delta={null} bomSeSobe
+          spark={cdbSpark} icone={<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />} />
+      </div>
+
+      {fluxo.dias.length > 1 && (
+        <>
+          <Section>Fluxo de caixa</Section>
+          <Card>
+            <FluxoChart data={fluxo.dias} />
+            <div className="grid grid-cols-3 gap-2 mt-2 text-center text-[12px] text-ink3">
+              <span>Entradas<br /><Money v={fluxo.entradas} className="text-ink font-semibold text-[14px]" /></span>
+              <span>Saídas<br /><Money v={fluxo.saidas} className="text-ink font-semibold text-[14px]" /></span>
+              <span>Sobra<br /><Money v={fluxo.sobra} signed className="text-ink font-semibold text-[14px]" /></span>
+            </div>
+          </Card>
+        </>
+      )}
+
       <ReceberCard />
 
       {noLucroAlvo(d).length > 0 && (
@@ -268,7 +300,7 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
             )}
           </Card>
 
-          <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="flex flex-col gap-3 mt-3">
             <Card onClick={() => setExplDist(true)}>
               <div className="text-[15px] font-semibold mb-1 flex justify-between">Distribuição <span className="text-ink3" aria-hidden>›</span></div>
               <CategoryDonut data={cats} onSelect={() => setExplDist(true)} />
@@ -446,7 +478,7 @@ function FixedBills({ d, month }: { d: Data; month: string }) {
           return (
             <button key={b.id} onClick={() => update((dd) => toggleBillPaid(dd, month, b.id))}
               className={`w-full flex items-center gap-3 py-3 text-left ${i ? "border-t border-line" : ""}`}>
-              <span className={`w-6 h-6 shrink-0 rounded-full grid place-items-center text-[13px] ${paid ? "bg-ok text-white" : "border-2 border-line text-transparent"}`} aria-hidden>✓</span>
+              <span className={`w-6 h-6 shrink-0 rounded-full grid place-items-center text-[13px] ${paid ? "bg-ok text-[#031a14]" : "border-2 border-line text-transparent"}`} aria-hidden>✓</span>
               <span className="flex-1 min-w-0">
                 <span className="block truncate">{b.name}</span>
                 {(() => {
@@ -548,6 +580,29 @@ function ExplicaMetas({ meu, alvo, teto, nome, spent, isNow, daysLeft, onVer }: 
         </div>
       </div>
       <Button className="w-full" onClick={onVer}>Ver contas e cenários</Button>
+    </div>
+  );
+}
+
+/** Cartão de destaque: ícone com brilho, valor, variação contra o mês passado e mini gráfico. */
+function StatCard({ id, cor, label, valor, signed, delta, bomSeSobe, spark, icone }: {
+  id: string; cor: string; label: string; valor: number; signed?: boolean; delta: number | null; bomSeSobe: boolean; spark: number[]; icone: React.ReactNode;
+}) {
+  const bom = delta === null ? true : bomSeSobe ? delta >= 0 : delta <= 0;
+  return (
+    <div className="card p-3.5 min-w-0">
+      <div className="flex items-center gap-2.5">
+        <span className="icone-brilho shrink-0" style={{ ["--cor" as string]: cor }}>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icone}</svg>
+        </span>
+        <span className="text-[12px] text-ink2 leading-tight">{label}</span>
+      </div>
+      <Money v={valor} signed={signed} className="block text-[21px] font-bold mt-2.5 truncate" />
+      <div className="text-[12px] mt-0.5 min-h-[18px]">
+        {delta === null ? <span className="text-ink3">por mês, sem IR</span>
+          : <span className={`font-semibold ${bom ? "var-up" : "var-down"}`}>{delta >= 0 ? "↑" : "↓"} {Math.abs(delta)}% <span className="text-ink3 font-normal">vs mês passado</span></span>}
+      </div>
+      <Spark data={spark} color={cor} id={id} />
     </div>
   );
 }

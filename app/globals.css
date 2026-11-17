@@ -4,83 +4,100 @@
 
 /* A fonte (Plus Jakarta Sans, no próprio app, offline) é declarada em layout.tsx, onde o caminho leva o prefixo do endereço. */
 
-/* Paleta navy: #05183c, #06296b, #1a3c7d, #101217, #0c0d0d.
-   As cores de gráfico saem de uma paleta validada para daltonismo. */
+/* Visual "vidro escuro": fundo azul-marinho com brilho, cartões translúcidos com borda luminosa,
+   destaques em ciano, azul e violeta. As cores de gráfico seguem a mesma família. */
 :root {
   color-scheme: light;
-  --bg: #f3f6fb;
+  --bg: #eef3fb;
+  --bg-glow: radial-gradient(700px 420px at 10% -8%, rgba(34, 167, 230, 0.14), transparent 62%), radial-gradient(700px 480px at 100% 6%, rgba(124, 58, 237, 0.10), transparent 58%);
   --card: #ffffff;
-  --fill: #e9eef7;
-  --line: #dfe6f1;
-  --ink: #05183c;
-  --ink2: #46566f;
-  --ink3: #66748b;
-  --brand: #06296b;
-  --link: #06296b; /* azul da marca como texto */
+  --card-glass: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 255, 0.86));
+  --sheet: #f6f9ff;
+  --fill: #e6edfb;
+  --line: rgba(40, 80, 160, 0.14);
+  --ink: #0b1b3f;
+  --ink2: #44546f;
+  --ink3: #64748f;
+  --brand: #1d4ed8;
+  --link: #1d4ed8;
   --on-brand: #ffffff;
-  --meu: #2a78d6;
-  --pai: #eb6834;
-  --ok: #157f52;
-  --alert: #c03a2b;
-  --meta: #a97400;
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #4a3aa7; --s5: #e87ba4; --s6: #eda100;
-  --hero: linear-gradient(135deg, #05183c 0%, #06296b 55%, #1a3c7d 100%);
-  --shadow: 0 1px 2px rgba(5, 24, 60, 0.06), 0 8px 24px rgba(5, 24, 60, 0.06);
+  --meu: #2563eb;
+  --pai: #e0621f;
+  --ok: #0f9d76;
+  --alert: #d6455a;
+  --meta: #b9801c;
+  --s1: #0891b2; --s2: #7c3aed; --s3: #0f9d76; --s4: #2563eb; --s5: #db2777; --s6: #d97706;
+  --hero: linear-gradient(135deg, #0b2a73 0%, #1148b8 52%, #1a8fc7 100%);
+  --glow: 0 0 22px rgba(37, 99, 235, 0.10);
+  --shadow: 0 1px 2px rgba(11, 27, 63, 0.06), 0 10px 28px rgba(11, 27, 63, 0.07);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0c0d0d;
-    --card: #101217;
-    --fill: #171c28;
-    --line: #202739;
-    --ink: #eaf0fa;
-    --ink2: #adb9cd;
-    --ink3: #8896ae;
-    --brand: #1a3c7d;
-    --link: #8db4f2; /* #1a3c7d como texto some no fundo escuro */
+    --bg: #050b1f;
+    --bg-glow: radial-gradient(760px 460px at 8% -6%, rgba(34, 211, 238, 0.13), transparent 62%), radial-gradient(720px 520px at 100% 8%, rgba(139, 92, 246, 0.16), transparent 58%), radial-gradient(900px 600px at 50% 110%, rgba(37, 99, 235, 0.10), transparent 60%);
+    --card: #0c1534;
+    --card-glass: linear-gradient(160deg, rgba(110, 150, 255, 0.13), rgba(110, 150, 255, 0.04));
+    --sheet: #08102b;
+    --fill: rgba(120, 150, 255, 0.11);
+    --line: rgba(120, 160, 255, 0.17);
+    --ink: #eef3ff;
+    --ink2: #a9b9dc;
+    --ink3: #8093ba;
+    --brand: #2563eb;
+    --link: #7cc4ff;
     --on-brand: #ffffff;
-    --meu: #3987e5;
-    --pai: #d95926;
-    --ok: #2fae7a;
-    --alert: #e0705f;
-    --meta: #d9a43a;
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #9085e9; --s5: #d55181; --s6: #c98500;
-    --hero: linear-gradient(135deg, #05183c 0%, #06296b 60%, #1a3c7d 100%);
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --meu: #4f8cff;
+    --pai: #ff8a4c;
+    --ok: #2de2b3;
+    --alert: #ff6b7a;
+    --meta: #f5c14e;
+    --s1: #22d3ee; --s2: #8b5cf6; --s3: #2de2b3; --s4: #4f8cff; --s5: #f472b6; --s6: #f5c14e;
+    --hero: linear-gradient(135deg, #0a1f5c 0%, #0c3a9a 48%, #0e8aa8 100%);
+    --glow: 0 0 26px rgba(56, 130, 255, 0.10);
+    --shadow: 0 12px 34px rgba(0, 0, 0, 0.38);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0c0d0d;
-  --card: #101217;
-  --fill: #171c28;
-  --line: #202739;
-  --ink: #eaf0fa;
-  --ink2: #adb9cd;
-  --ink3: #8896ae;
-  --brand: #1a3c7d;
-  --link: #8db4f2;
+  --bg: #050b1f;
+  --bg-glow: radial-gradient(760px 460px at 8% -6%, rgba(34, 211, 238, 0.13), transparent 62%), radial-gradient(720px 520px at 100% 8%, rgba(139, 92, 246, 0.16), transparent 58%), radial-gradient(900px 600px at 50% 110%, rgba(37, 99, 235, 0.10), transparent 60%);
+  --card: #0c1534;
+  --card-glass: linear-gradient(160deg, rgba(110, 150, 255, 0.13), rgba(110, 150, 255, 0.04));
+  --sheet: #08102b;
+  --fill: rgba(120, 150, 255, 0.11);
+  --line: rgba(120, 160, 255, 0.17);
+  --ink: #eef3ff;
+  --ink2: #a9b9dc;
+  --ink3: #8093ba;
+  --brand: #2563eb;
+  --link: #7cc4ff;
   --on-brand: #ffffff;
-  --meu: #3987e5;
-  --pai: #d95926;
-  --ok: #2fae7a;
-  --alert: #e0705f;
-  --meta: #d9a43a;
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #9085e9; --s5: #d55181; --s6: #c98500;
-  --hero: linear-gradient(135deg, #05183c 0%, #06296b 60%, #1a3c7d 100%);
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --meu: #4f8cff;
+  --pai: #ff8a4c;
+  --ok: #2de2b3;
+  --alert: #ff6b7a;
+  --meta: #f5c14e;
+  --s1: #22d3ee; --s2: #8b5cf6; --s3: #2de2b3; --s4: #4f8cff; --s5: #f472b6; --s6: #f5c14e;
+  --hero: linear-gradient(135deg, #0a1f5c 0%, #0c3a9a 48%, #0e8aa8 100%);
+  --glow: 0 0 26px rgba(56, 130, 255, 0.10);
+  --shadow: 0 12px 34px rgba(0, 0, 0, 0.38);
 }
 
 html,
 body {
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--ink);
   font-family: "Plus Jakarta Sans", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+}
+body {
+  background-image: var(--bg-glow);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 .num {
@@ -88,16 +105,48 @@ body {
   letter-spacing: -0.02em;
 }
 
+/* Cartão de vidro: fundo translúcido, borda luminosa e brilho suave */
 .card {
-  background: var(--card);
+  background: var(--card-glass), var(--card);
+  border: 1px solid var(--line);
   border-radius: 20px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), var(--glow);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .card { background: var(--card-glass), rgba(8, 14, 40, 0.55); }
+}
+:root[data-theme="dark"] .card { background: var(--card-glass), rgba(8, 14, 40, 0.55); }
 
 .hero {
   background: var(--hero);
   color: #fff;
+  border: 1px solid rgba(150, 200, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset, 0 18px 50px rgba(20, 90, 230, 0.28), 0 0 40px rgba(34, 211, 238, 0.10);
 }
+
+/* Botão principal em gradiente, com brilho */
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #2a8fe8 60%, #22c3ee 100%);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.35);
+}
+.btn-soft { border: 1px solid var(--line); }
+
+/* Bolha do ícone nos destaques (como nos cartões da referência) */
+.icone-brilho {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+  background: linear-gradient(145deg, rgba(110, 150, 255, 0.22), rgba(110, 150, 255, 0.06));
+  border: 1px solid var(--line);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--cor, var(--meu)) 35%, transparent);
+  color: var(--cor, var(--meu));
+}
+/* Setinhas de variação */
+.var-up { color: var(--ok); }
+.var-down { color: var(--alert); }
+/* Selo de status (Pago, Pendente...) */
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: color-mix(in srgb, var(--cor, var(--meu)) 18%, transparent); color: var(--cor, var(--meu)); border: 1px solid color-mix(in srgb, var(--cor, var(--meu)) 35%, transparent); }
 
 /* Campos: 16px evita o zoom automático do iPhone ao focar. */
 /* Evita que campos de data/hora e números passem do cartão no iPhone */
@@ -117,6 +166,7 @@ select {
   font-size: 16px;
   background: var(--fill);
   color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px;
   width: 100%;
@@ -158,6 +208,7 @@ button:focus-visible {
 @keyframes sheet-out { to { transform: translateY(60px) scale(.94); opacity: 0; } }
 @keyframes scrim-in { from { opacity: 0; } }
 @keyframes scrim-out { to { opacity: 0; } }
+.sheet-in { background: var(--sheet); border-top: 1px solid var(--line); box-shadow: 0 -22px 60px rgba(0, 0, 0, 0.45), 0 -1px 0 rgba(130, 170, 255, 0.28) inset; }
 .anim .sheet-in { animation: sheet-in .34s cubic-bezier(.2,.85,.25,1) both; transform-origin: 50% 100%; }
 .anim .sheet-scrim { animation: scrim-in .26s ease-out both; }
 .anim .sheet-leaving .sheet-in, .sheet-ghost .sheet-in { animation: sheet-out .24s cubic-bezier(.5,0,.9,.6) both !important; }
@@ -169,3 +220,33 @@ button:focus-visible {
 .collapse[data-open="true"] { grid-template-rows: 1fr; opacity: 1; visibility: visible; }
 .anim .collapse { transition: grid-template-rows .34s cubic-bezier(.2,.8,.2,1), opacity .26s ease, visibility 0s linear .34s; }
 .anim .collapse[data-open="true"] { transition: grid-template-rows .34s cubic-bezier(.2,.8,.2,1), opacity .26s ease, visibility 0s; }
+
+/* ---------- abertura (planeta e órbita) ---------- */
+.abertura { position: fixed; inset: 0; z-index: 200; display: grid; place-content: center; justify-items: center; gap: 4px;
+  background-color: var(--bg); background-image: var(--bg-glow); animation: abertura-sai 2.4s ease forwards; }
+html[data-splash="off"] .abertura { display: none; }
+.abertura-svg { width: min(300px, 78vw); height: auto; overflow: visible; }
+.ab-planeta { transform-origin: 150px 150px; animation: ab-entra .7s cubic-bezier(.2,.8,.2,1) both; }
+.ab-halo { transform-origin: 150px 150px; animation: ab-pulsa 2.3s ease-in-out both; }
+.ab-anel { stroke-dasharray: 1; animation: ab-desenha 1s ease-out both; }
+@keyframes ab-entra { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes ab-pulsa { 0% { opacity: 0; transform: scale(.6); } 40% { opacity: 1; } 100% { opacity: .8; transform: scale(1.08); } }
+@keyframes ab-desenha { from { stroke-dashoffset: 1; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
+.abertura-nome { font-size: 30px; font-weight: 800; letter-spacing: .32em; text-indent: .32em; color: var(--ink);
+  text-shadow: 0 0 22px rgba(56, 189, 248, .45); opacity: 0; animation: ab-nome 1.2s .6s ease-out forwards; }
+@keyframes ab-nome { from { opacity: 0; transform: translateY(8px); letter-spacing: .6em; } to { opacity: 1; transform: none; letter-spacing: .32em; } }
+@keyframes abertura-sai { 0%, 82% { opacity: 1; visibility: visible; } 100% { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .abertura { display: none; } }
+
+/* abas do topo (Importar, Ajustes...) com o mesmo vidro */
+.seg-on { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(11, 27, 63, .12); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .seg-on { background: linear-gradient(160deg, rgba(100, 150, 255, .30), rgba(100, 150, 255, .10)); box-shadow: 0 0 14px rgba(80, 150, 255, .25), 0 0 0 1px rgba(130, 180, 255, .35) inset; }
+}
+:root[data-theme="dark"] .seg-on { background: linear-gradient(160deg, rgba(100, 150, 255, .30), rgba(100, 150, 255, .10)); box-shadow: 0 0 14px rgba(80, 150, 255, .25), 0 0 0 1px rgba(130, 180, 255, .35) inset; }
+
+/* brilho nas linhas dos gráficos */
+.recharts-line .recharts-line-curve, .recharts-area .recharts-area-curve { filter: drop-shadow(0 0 5px rgba(80, 150, 255, .5)); }
+
+/* o cartão principal mantém o degradê azul (a regra do vidro escuro tem mais peso, então repetimos aqui) */
+:root .hero.card, :root:not([data-theme="light"]) .hero.card, :root[data-theme="dark"] .hero.card { background: var(--hero); }

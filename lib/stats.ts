@@ -65,3 +65,19 @@ export function fatherFlow(monthTxs: Tx[]) {
   const repasse = sum((t) => t.category === "passthrough");
   return { entrou, saiu, repasse, sobrou: entrou - saiu + repasse };
 }
+
+/** Entradas e saídas (suas, sem pai, repasse nem CDB) acumuladas dia a dia no mês, para o fluxo de caixa. */
+export function fluxoDoMes(txs: Tx[], month: string, uptoToday: boolean) {
+  const n = daysInMonth(month);
+  const ent = new Array(n + 1).fill(0), sai = new Array(n + 1).fill(0);
+  for (const t of ofMonth(txs, month)) {
+    const tp = typeOf(t.category);
+    const dia = Number(t.date.slice(8, 10));
+    if (t.amount > 0 && tp === "income") ent[dia] += t.amount;
+    if (t.amount < 0 && (tp === "variable" || tp === "fixed")) sai[dia] -= t.amount;
+  }
+  const ultimo = uptoToday ? new Date().getDate() : n;
+  let e = 0, s = 0;
+  const dias = Array.from({ length: ultimo }, (_, i) => { e += ent[i + 1]; s += sai[i + 1]; return { day: i + 1, entradas: Math.round(e), saidas: Math.round(s) }; });
+  return { dias, entradas: e, saidas: s, sobra: e - s };
+}

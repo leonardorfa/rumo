@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import Abertura from "@/components/Abertura";
 
 const base = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
@@ -17,7 +18,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f2f2f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: dark)", color: "#050b1f" },
   ],
 };
 
@@ -29,11 +30,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Tema salvo aplicado antes de pintar a tela. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}`,
+            __html: `try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}try{var h=document.documentElement;if(localStorage.getItem('orbita-splash')==='0'||matchMedia('(prefers-reduced-motion: reduce)').matches||sessionStorage.getItem('orbita-splash-visto')){h.dataset.splash='off'}else{sessionStorage.setItem('orbita-splash-visto','1')}}catch(e){}`,
           }}
         />
       </head>
-      <body>{children}</body>
+      <body><Abertura />{children}</body>
     </html>
   );
 }

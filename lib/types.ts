@@ -56,6 +56,7 @@ export interface Prefs {
   countReceivables: boolean; // o que te devem conta no "meu dinheiro"
   countInvoices: boolean; // a fatura do cartão em aberto desconta do "meu dinheiro"
   anim: boolean; // animações e gráficos 3D
+  splash: boolean; // animação de abertura (planeta e órbita) ao abrir o app
   birth: string; // data de nascimento (YYYY-MM-DD), para as metas por idade
   returnPct: number; // retorno esperado ao ano, para as metas de longo prazo
   payday: number; // dia do salário (0 = descobrir pelo extrato)

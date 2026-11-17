@@ -1014,3 +1014,34 @@ console.log("treino livre, objetivos e exercícios parecidos ok");
   assert.ok(/livre \? \[\]/.test(tr), "treino livre começa sem exercícios");
 }
 console.log("regressões de 15/11 ok");
+
+// ---- fluxo de caixa do mês (cartões de destaque e gráfico do Início) ----
+{
+  const St = require("../lib/stats") as typeof import("../lib/stats");
+  const tx = (date: string, amount: number, category: string) => ({ id: date + category + amount, date, description: "x", amount, category, review: false });
+  const txs = [
+    tx("2026-10-02", 3000, "income_salary"), tx("2026-10-02", -100, "var_food"), tx("2026-10-05", -50, "fixed_rent"),
+    tx("2026-10-05", -999, "fathers_expense"), tx("2026-10-06", -300, "pay_card"), tx("2026-10-09", 500, "income_fathers"),
+  ] as import("../lib/types").Tx[];
+  const f = St.fluxoDoMes(txs, "2026-10", false);
+  assert.equal(f.entradas, 3000, "só renda sua entra (pai fica de fora)");
+  assert.equal(f.saidas, 150, "só gasto variável e fixo (pai e pagamento de fatura ficam de fora)");
+  assert.equal(f.sobra, 2850);
+  assert.deepEqual(f.dias.slice(0, 5).map((d) => [d.entradas, d.saidas]), [[0, 0], [3000, 100], [3000, 100], [3000, 100], [3000, 150]], "acumula dia a dia");
+  assert.equal(f.dias.length, 31);
+}
+console.log("fluxo do mês ok");
+
+// ---- abertura (planeta e órbita) e visual ----
+{
+  const fs = require("fs") as typeof import("fs");
+  assert.equal((require("../lib/store") as typeof import("../lib/store")).DEFAULT_PREFS.splash, true, "a abertura vem ligada");
+  const lay = fs.readFileSync("app/layout.tsx", "utf8");
+  assert.ok(/prefers-reduced-motion: reduce/.test(lay) && /orbita-splash/.test(lay) && /orbita-splash-visto/.test(lay), "a abertura respeita reduzir movimento, a preferência e aparece uma vez por sessão");
+  assert.ok(/html\[data-splash="off"\] \.abertura/.test(fs.readFileSync("app/globals.css", "utf8")), "o CSS esconde a abertura quando desligada");
+  // texto branco sobre o verde-água claro do tema escuro some: o fundo --ok leva texto escuro
+  for (const f of ["components/Home.tsx", "components/Treino.tsx", "components/CalendarioTreino.tsx"]) assert.ok(!/bg-ok text-white/.test(fs.readFileSync(f, "utf8")), f + ": bg-ok com texto branco");
+  // gráficos do Recharts não aceitam componentes próprios como filho: os degradês entram como <defs> direto
+  assert.ok(!/<Gradientes/.test(fs.readFileSync("components/charts.tsx", "utf8")), "defs dos gráficos não podem estar dentro de um componente (as colunas ficavam invisíveis)");
+}
+console.log("abertura e visual ok");
