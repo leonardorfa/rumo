@@ -7,6 +7,7 @@ import { fatherFlow, ofMonth } from "@/lib/stats";
 import { fatherBalance, fatherDelete, fatherPending, fatherMove, fatherSet, monthKey, syncFather, update, useData } from "@/lib/store";
 import type { Tx } from "@/lib/types";
 import { FatherChart } from "./charts";
+import { Brilho } from "./Destaques";
 import { TxList, TxSheet } from "./Tx";
 import { Button, Card, Money, MonthSwitcher, Section, Segmented, Sheet, Title, toast } from "./ui";
 
@@ -65,13 +66,20 @@ export default function Pai({ month, setMonth }: { month: string; setMonth: (m: 
         <MonthSwitcher month={month} onChange={setMonth} max={monthKey()} />
       </div>
       <Card>
-        <Row label="Entrou do pai" v={flow.entrou} className="text-ok" />
-        <Row label="Saiu em nome dele" v={flow.saiu} />
-        {!!flow.repasse && <Row label="Repasses (entra e sai)" v={flow.repasse} signed />}
-        <div className="flex justify-between border-t border-line mt-2 pt-2">
-          <span className="font-semibold">{flow.sobrou >= 0 ? "Ficou com você" : "Você cobriu"}</span>
-          <Money v={Math.abs(flow.sobrou)} className="font-semibold" />
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          {[
+            { k: "Entrou do pai", v: flow.entrou, cor: "var(--s3)", i: <path d="M12 19V5M6 11l6-6 6 6" /> },
+            { k: "Saiu em nome dele", v: flow.saiu, cor: "var(--s2)", i: <path d="M12 5v14M6 13l6 6 6-6" /> },
+            { k: flow.sobrou >= 0 ? "Ficou com você" : "Você cobriu", v: Math.abs(flow.sobrou), cor: "var(--pai)", i: <path d="M5 20V10M12 20V4M19 20v-7" /> },
+          ].map((x) => (
+            <div key={x.k} className="rounded-2xl border border-line bg-fill p-2.5 min-w-0 text-center flex flex-col items-center gap-1">
+              <Brilho cor={x.cor} tam={30}>{x.i}</Brilho>
+              <div className="text-[11px] text-ink3 leading-tight">{x.k}</div>
+              <Money v={x.v} className="font-bold text-[clamp(12px,3.5vw,14px)] max-w-full truncate" />
+            </div>
+          ))}
         </div>
+        {!!flow.repasse && <Row label="Repasses (entra e sai)" v={flow.repasse} signed />}
         {soltas.length > 0 ? (
           <Button className="w-full mt-3" onClick={() => {
             update((dd) => syncFather(dd, soltas));

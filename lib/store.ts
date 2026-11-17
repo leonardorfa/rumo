@@ -863,6 +863,11 @@ export function addParcelamento(d: Data, p: { name: string; parcela: number; fro
   return { ...d, config: { ...d.config, bills: [...d.config.bills, b] } };
 }
 
+/** Recusa o aviso de preço novo de uma conta (volta a avisar só se o valor mudar de novo). */
+export const dismissPrice = (d: Data, billId: string, novo: number): Data => ({
+  ...d, config: { ...d.config, dismissedPrices: [...(d.config.dismissedPrices ?? []), `${billId}:${novo}`] },
+});
+
 export const dismissRecurring = (d: Data, key: string): Data => ({
   ...d, config: { ...d.config, dismissedRecurring: [...d.config.dismissedRecurring, key] },
 });

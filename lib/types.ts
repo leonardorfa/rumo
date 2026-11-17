@@ -91,6 +91,7 @@ export interface Config {
   billsPaid: Record<string, string[]>; // mês -> ids de contas marcadas como pagas
   lock: { on: boolean; pinHash: string; credId: string }; // trava do app
   dismissedRecurring: string[]; // sugestões de conta fixa que você recusou
+  dismissedPrices?: string[]; // avisos de "conta mudou de preço" que você recusou ("id:valor")
   invoices: Invoice[]; // faturas do cartão importadas
 }
 

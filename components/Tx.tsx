@@ -14,11 +14,11 @@ export function TxRow({ t, onOpen }: { t: Tx; onOpen: (t: Tx) => void }) {
   const customs = useData().config.customCats;
   return (
     <button onClick={() => onOpen(t)} className="w-full flex items-center gap-3 py-2.5 text-left">
-      <span className="w-10 h-10 shrink-0 rounded-full bg-fill grid place-items-center text-lg" aria-hidden>{catIcon(t.category, customs)}</span>
+      <span className="icone-brilho text-lg" aria-hidden>{catIcon(t.category, customs)}</span>
       <span className="flex-1 min-w-0">
         <span className="block truncate text-[16px]">{prettyName(t.description)}</span>
         <span className="block text-[13px] text-ink3 truncate">
-          {t.review ? <span className="text-alert font-medium">Revisar · </span> : null}
+          {t.review ? <><span className="pill" style={{ ["--cor" as string]: "var(--alert)" }}>Revisar</span>{" "}</> : null}
           {t.card ? "💳 " : ""}{t.manual ? "✍️ " : ""}{t.splitFrom ? "✂️ " : ""}
           {catName(t.category, customs)}{t.category === "pay_card" ? " · as compras estão em Cartão" : ""}
           {t.installment ? ` · parcela ${t.installment}` : ""}

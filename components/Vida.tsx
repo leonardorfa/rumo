@@ -11,6 +11,7 @@ import type { Goal } from "@/lib/types";
 import { TrendChart } from "./charts";
 import Assistente from "./Assistente";
 import { Partes } from "./Partes";
+import { Ring } from "./Destaques";
 import { PesoSheet } from "./Treino";
 import { act, Button, Card, Money, Progress, Section, Segmented, Sheet, toast } from "./ui";
 
@@ -91,11 +92,15 @@ function GoalCard({ g, onEdit, onPeso, onValor }: { g: Goal; onEdit: () => void;
         <span aria-hidden>{g.icon}</span> {g.title}
       </Section>
       <Card>
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[26px] font-bold num truncate">{fmtG(g, s.atual)}</span>
-          <span className="text-ink3 shrink-0">de {fmtG(g, g.target)}</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[26px] font-bold num truncate">{fmtG(g, s.atual)}</div>
+            <div className="text-ink3">de {fmtG(g, g.target)}</div>
+          </div>
+          <Ring value={s.pct} max={100} size={72} stroke={8} cor={s.batida || s.naFrente ? "var(--ok)" : "var(--meta)"}>
+            <span className="text-[15px] font-bold num">{s.pct}%</span>
+          </Ring>
         </div>
-        <div className="mt-2"><Progress value={s.pct} max={100} color={s.naFrente ? "var(--ok)" : "var(--meta)"} /></div>
         <div className="flex justify-between text-[13px] text-ink2 mt-2 gap-2">
           <span>{s.batida ? "✓ Meta batida" : `${s.pct}% · faltam ${fmtG(g, Math.abs(g.target - s.atual))}`}</span>
           <span className="shrink-0">{g.deadline > hoje ? `faltam ${spanText(hoje, g.deadline)}` : "prazo chegou"}</span>

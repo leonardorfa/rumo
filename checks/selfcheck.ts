@@ -216,6 +216,13 @@ assert.equal(rec[0].amount, 44.9, "sugere o valor mais recente");
 rr = { ...rr, config: { ...rr.config, bills: [{ id: "n", name: "Netflix", amount: 39.9, match: "NETFLIX", atSource: false }] } };
 assert.equal(recurringSuggestions(rr, "2026-09").length, 0, "já é conta fixa: não sugere");
 assert.deepEqual(priceChanges(rr, "2026-09").map((p) => p.novo), [44.9], "avisa que a Netflix subiu");
+// recusar o aviso de preço: some, e só volta se o valor mudar de novo
+{
+  const recusado = require("../lib/store").dismissPrice(rr, "n", 44.9) as Data;
+  assert.equal(priceChanges(recusado, "2026-09").length, 0, "aviso de preço recusado não volta");
+  const outroPreco = { ...recusado, txs: [...recusado.txs, tx("2026-09-20", "NETFLIX.COM", -49.9)] };
+  assert.deepEqual(priceChanges(outroPreco, "2026-09").map((p) => p.novo), [49.9], "avisa de novo se o preço mudar outra vez");
+}
 
 // ---- próximos 30 dias ----
 let fc: Data = { ...g, txs: [tx("2026-08-05", "SALARIO", 2270, "income_salary")],

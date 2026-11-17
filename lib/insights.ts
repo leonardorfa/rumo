@@ -90,7 +90,8 @@ export function priceChanges(d: Data, now = monthKey()) {
   const recentes = [now, shiftMonth(now, -1)];
   return d.config.bills.filter((b) => !b.until).flatMap((b) => {
     const last = newest(d.txs.filter((t) => matches(b, t) && recentes.includes(t.date.slice(0, 7))));
-    return last && Math.abs(-last.amount - b.amount) >= 0.5 ? [{ bill: b, novo: r2(-last.amount) }] : [];
+    const recusado = last && (d.config.dismissedPrices ?? []).includes(`${b.id}:${r2(-last.amount)}`);
+    return last && !recusado && Math.abs(-last.amount - b.amount) >= 0.5 ? [{ bill: b, novo: r2(-last.amount) }] : [];
   });
 }
 

@@ -240,14 +240,20 @@ export function FatherChart({ data }: { data: { label: string; value: number }[]
   return (
     <div className="h-36 -ml-2">
       <ResponsiveContainer>
-        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="g-pai" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" style={{ stopColor: "var(--pai)", stopOpacity: 0.45 }} />
+              <stop offset="100%" style={{ stopColor: "var(--pai)", stopOpacity: 0 }} />
+            </linearGradient>
+          </defs>
           <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
           <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
           <YAxis tick={hidden ? false : axis} tickLine={false} axisLine={false} width={hidden ? 4 : 44} tickFormatter={short} />
           {!hidden && <Tooltip {...tip} formatter={(v: number) => [brl(v), "Crédito do pai"]} />}
           <ReferenceLine y={0} stroke="var(--ink3)" />
-          <Line type="stepAfter" dataKey="value" stroke="var(--pai)" strokeWidth={2.5} dot={false} isAnimationActive={animOn()} animationDuration={900} />
-        </LineChart>
+          <Area type="stepAfter" dataKey="value" baseValue={0} stroke="var(--pai)" strokeWidth={2.5} fill="url(#g-pai)" dot={false} isAnimationActive={animOn()} animationDuration={900} />
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );

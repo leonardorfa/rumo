@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { brl, brl0, localDay } from "@/lib/format";
 import { alvosAtingidos, apagarCripto, buscarPrecos, comprarCripto, criptoOf, definirPreco, historicoDe, posicao, salvarCripto, totais, venderCripto } from "@/lib/cripto";
 import { getData } from "@/lib/store";
-import { update, useData } from "@/lib/store";
+import { cdbNet, update, useData } from "@/lib/store";
+import { cdbSerie } from "@/lib/cdb";
+import { StatCard } from "./Destaques";
 import type { Cripto } from "@/lib/types";
 import Cdb from "./Cdb";
 import { Bars3D, TrendChart } from "./charts";
@@ -30,10 +32,23 @@ const dataBR = (iso: string) => (iso ? iso.split("-").reverse().join("/") : "dat
 export default function Investimentos() {
   const [aba, setAba] = useState<Aba>(() => { try { return (localStorage.getItem("aba-invest") as Aba) || "renda"; } catch { return "renda"; } });
   const troca = (v: Aba) => { setAba(v); try { localStorage.setItem("aba-invest", v); } catch { /* ok */ } };
+  const d = useData();
+  const n = cdbNet(d);
+  const t = totais(d);
+  const principal = n.bruto - n.rendimento;
+  const rendPct = principal > 0 ? Math.round((n.rendimento / principal) * 1000) / 10 : 0;
+  const cripto = criptoOf(d);
   return (
     <div>
       <Title>Investimentos</Title>
-      <div className="sticky top-0 z-20 -mx-4 px-4 pt-1 pb-2 bg-bg" style={{ paddingTop: "max(4px, env(safe-area-inset-top))" }}>
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard id="rf" cor="var(--s4)" label="Renda fixa, líquido" valor={n.liquido} nota={`rendeu ${rendPct.toLocaleString("pt-BR")}% sobre o aplicado`}
+          spark={(() => { try { return cdbSerie(d).slice(-30).map((x) => x.bruto); } catch { return []; } })()} icone={<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />} />
+        <StatCard id="cr" cor={t.resultado < 0 ? "var(--alert)" : "var(--s3)"} label="Cripto, valor" valor={t.valor}
+          nota={cripto.length ? `${t.resultado < 0 ? "perdeu" : "ganhou"} ${Math.abs(t.pct).toLocaleString("pt-BR")}%` : "nenhuma moeda ainda"}
+          spark={historico(cripto).map((x) => x.value)} icone={<path d="M12 3v18M16 7.5c0-1.7-1.8-3-4-3s-4 1.3-4 3 1.8 3 4 3 4 1.3 4 3-1.8 3-4 3-4-1.3-4-3" />} />
+      </div>
+      <div className="sticky top-0 z-20 -mx-4 px-4 pt-3 pb-2 bg-bg" style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}>
         <Segmented value={aba} onChange={troca} options={[{ value: "renda", label: "Renda fixa (CDB)" }, { value: "cripto", label: "Cripto" }]} />
       </div>
       {aba === "renda" ? <Cdb /> : <CriptoTab />}

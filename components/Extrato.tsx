@@ -7,6 +7,7 @@ import { brl, monthName } from "@/lib/format";
 import { ofMonth } from "@/lib/stats";
 import { monthKey, useData } from "@/lib/store";
 import type { Tx } from "@/lib/types";
+import { Brilho } from "./Destaques";
 import { TxList, TxSheet } from "./Tx";
 import { Card, Money, MonthSwitcher, Segmented, Title } from "./ui";
 
@@ -83,11 +84,19 @@ export default function Extrato({ month, setMonth, filter, setFilter }: {
           </div>
         </Card>
       ) : (
-        <Card className="mt-3 grid grid-cols-3 gap-1 text-center text-[clamp(12px,3.8vw,16px)]">
-          <div><div className="text-[13px] text-ink3">Entrou</div><Money v={inflow} className="text-ok font-semibold" /></div>
-          <div><div className="text-[13px] text-ink3">Saiu</div><Money v={-outflow} className="font-semibold" /></div>
-          <div><div className="text-[13px] text-ink3">Resultado</div><Money v={inflow + outflow} signed className="font-semibold" /></div>
-        </Card>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {[
+            { k: "Entrou", v: inflow, cor: "var(--s3)", signed: false, i: <path d="M12 19V5M6 11l6-6 6 6" /> },
+            { k: "Saiu", v: -outflow, cor: "var(--s2)", signed: false, i: <path d="M12 5v14M6 13l6 6 6-6" /> },
+            { k: "Resultado", v: inflow + outflow, cor: "var(--s1)", signed: true, i: <path d="M5 20V10M12 20V4M19 20v-7" /> },
+          ].map((x) => (
+            <div key={x.k} className="card p-2.5 min-w-0 text-center flex flex-col items-center gap-1">
+              <Brilho cor={x.cor} tam={32}>{x.i}</Brilho>
+              <div className="text-[12px] text-ink3">{x.k}</div>
+              <Money v={x.v} signed={x.signed} className="font-bold text-[clamp(12px,3.6vw,15px)] max-w-full truncate" />
+            </div>
+          ))}
+        </div>
       )}
       {soConta && doCartao.length > 0 && (
         <button onClick={() => setFilter("card")} className="w-full text-left text-[13px] text-ink3 px-1 mt-2">

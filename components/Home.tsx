@@ -8,10 +8,11 @@ import { typeOf } from "@/lib/categories";
 import { byCategory, cumulative, envelopes, fluxoDoMes, isMyVariableSpend, ofMonth, variableSpend } from "@/lib/stats";
 import { billPaid, categoryTable, priceChanges, recurringSuggestions, safeToSpend } from "@/lib/insights";
 import { saveBackup } from "@/lib/backup";
-import { billActive, cdbNet, changesSinceBackup, fatherPending, moneyParts, cdbPerDay, dismissRecurring, fatherBalance, monthKey, myMoney, parcela, projectionInput, toggleBillPaid, update, useData } from "@/lib/store";
+import { billActive, cdbNet, changesSinceBackup, fatherPending, moneyParts, cdbPerDay, dismissPrice, dismissRecurring, fatherBalance, monthKey, myMoney, parcela, projectionInput, toggleBillPaid, update, useData } from "@/lib/store";
 import type { Data, Tx } from "@/lib/types";
 import { cdbRende, cdbSerie } from "@/lib/cdb";
-import { Bars3D, CategoryBars, CategoryDonut, CumulativeChart, FluxoChart, Spark, type CatDatum } from "./charts";
+import { Bars3D, CategoryBars, CategoryDonut, CumulativeChart, FluxoChart, type CatDatum } from "./charts";
+import { StatCard } from "./Destaques";
 import { noLucroAlvo, posicao } from "@/lib/cripto";
 import { TxList, TxRow, TxSheet } from "./Tx";
 import Revisar from "./Revisar";
@@ -235,7 +236,7 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
           spark={fluxo.dias.map((x) => x.entradas)} icone={<path d="M12 19V5M6 11l6-6 6 6" />} />
         <StatCard id="sobra" cor="var(--s1)" label="Sobra do mês" valor={fluxo.sobra} signed delta={pctVs(fluxo.sobra, fluxoAnt.sobra)} bomSeSobe
           spark={fluxo.dias.map((x) => x.entradas - x.saidas)} icone={<path d="M5 20V10M12 20V4M19 20v-7" />} />
-        <StatCard id="cdbmes" cor="var(--s4)" label="CDB rende por mês" valor={cdbMes} delta={null} bomSeSobe
+        <StatCard id="cdbmes" cor="var(--s4)" label="CDB rende por mês" valor={cdbMes} delta={null} nota="por mês, sem IR"
           spark={cdbSpark} icone={<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />} />
       </div>
 
@@ -408,9 +409,12 @@ function Sugestoes({ d }: { d: Data }) {
         {mudou.map(({ bill, novo }) => (
           <Card key={bill.id} className="!py-3">
             <div className="text-[15px]"><b>{bill.name}</b> veio {novo > bill.amount ? "mais caro" : "mais barato"}: {brl(bill.amount)} → {brl(novo)}</div>
-            <Button className="mt-2 w-full !h-9" onClick={() => act(`${bill.name} atualizada`, (dd) => ({
-              ...dd, config: { ...dd.config, bills: dd.config.bills.map((b) => (b.id === bill.id ? { ...b, amount: novo } : b)) },
-            }))}>Atualizar para {brl(novo)}</Button>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <Button className="!h-9" onClick={() => act("Não aviso mais desse valor", (dd) => dismissPrice(dd, bill.id, novo))}>Ignorar</Button>
+              <Button tone="primary" className="!h-9" onClick={() => act(`${bill.name} atualizada`, (dd) => ({
+                ...dd, config: { ...dd.config, bills: dd.config.bills.map((b) => (b.id === bill.id ? { ...b, amount: novo } : b)) },
+              }))}>Atualizar para {brl(novo)}</Button>
+            </div>
           </Card>
         ))}
         {rec.map((r) => (
@@ -580,29 +584,6 @@ function ExplicaMetas({ meu, alvo, teto, nome, spent, isNow, daysLeft, onVer }: 
         </div>
       </div>
       <Button className="w-full" onClick={onVer}>Ver contas e cenários</Button>
-    </div>
-  );
-}
-
-/** Cartão de destaque: ícone com brilho, valor, variação contra o mês passado e mini gráfico. */
-function StatCard({ id, cor, label, valor, signed, delta, bomSeSobe, spark, icone }: {
-  id: string; cor: string; label: string; valor: number; signed?: boolean; delta: number | null; bomSeSobe: boolean; spark: number[]; icone: React.ReactNode;
-}) {
-  const bom = delta === null ? true : bomSeSobe ? delta >= 0 : delta <= 0;
-  return (
-    <div className="card p-3.5 min-w-0">
-      <div className="flex items-center gap-2.5">
-        <span className="icone-brilho shrink-0" style={{ ["--cor" as string]: cor }}>
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icone}</svg>
-        </span>
-        <span className="text-[12px] text-ink2 leading-tight">{label}</span>
-      </div>
-      <Money v={valor} signed={signed} className="block text-[21px] font-bold mt-2.5 truncate" />
-      <div className="text-[12px] mt-0.5 min-h-[18px]">
-        {delta === null ? <span className="text-ink3">por mês, sem IR</span>
-          : <span className={`font-semibold ${bom ? "var-up" : "var-down"}`}>{delta >= 0 ? "↑" : "↓"} {Math.abs(delta)}% <span className="text-ink3 font-normal">vs mês passado</span></span>}
-      </div>
-      <Spark data={spark} color={cor} id={id} />
     </div>
   );
 }

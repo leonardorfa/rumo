@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { shareFile } from "@/lib/backup";
 import { localDay } from "@/lib/format";
 import {
-  rascunhoChave, seriesFaltando, parecidosCom, marcarDistintos, paresParecidos, juntarExercicios, agrupar, buildIcs, deleteRoutine, GRUPOS, grupoDaRotina, grupoDe, MODELOS, setExGroup, planForDay, setDayExtra, deleteWeight, deleteWorkout, exerciseHistory, fitOf, goalStatus, knownExercises, lastSets, logWeight,
+  rascunhoChave, seriesFaltando, parecidosCom, marcarDistintos, paresParecidos, juntarExercicios, alvosOf, aguaOf, feitoNaSemana, fmtAgua, agrupar, buildIcs, deleteRoutine, GRUPOS, grupoDaRotina, grupoDe, MODELOS, setExGroup, planForDay, setDayExtra, deleteWeight, deleteWorkout, exerciseHistory, fitOf, goalStatus, knownExercises, lastSets, logWeight,
   recordsOf, saveRoutine, saveWorkout, setTrainingDay, setTrainingTime, SUGESTOES, weekStats, weeklyVolume, weightTrend, WEEKDAYS,
 } from "@/lib/life";
 import { update, useData } from "@/lib/store";
 import type { Cardio, Routine, Workout } from "@/lib/types";
 import { Bars3D, BarsChart, MiniTrend, TrendChart } from "./charts";
 import CalendarioTreino from "./CalendarioTreino";
+import { RingTile } from "./Destaques";
 import { AguaCard, MetasSemana, PesoLevantado } from "./Habitos";
 import { act, Button, Card, Progress, Section, Segmented, Sheet, Title, toast } from "./ui";
 
@@ -71,7 +72,8 @@ function Hoje() {
           </Button>
         </Card>
       )}
-      <Card className={semRotinas ? "mt-3" : "mt-1"}>
+      <PainelDoTreino />
+      <Card className={semRotinas ? "mt-3" : "mt-3"}>
         <div className="text-[13px] text-ink3">{WEEKDAYS[wd]}, {dataBR(hoje).slice(0, 5)}</div>
         {feitoHoje ? (
           <>
@@ -560,6 +562,27 @@ function PorTreino() {
         })}
       </div>
     </>
+  );
+}
+
+/** Os quatro números da semana, cada um com seu anel: treinos, séries, cardio e água de hoje. */
+function PainelDoTreino() {
+  const d = useData();
+  const ws = weekStats(d);
+  const al = alvosOf(d);
+  const feito = feitoNaSemana(d);
+  const ag = aguaOf(d);
+  const seriesFeitas = Object.values(feito.series).reduce((a, b) => a + b, 0);
+  const seriesAlvo = Object.values(al.series).reduce((a, b) => a + b, 0);
+  const aguaHoje = ag.log[localDay()] ?? 0;
+  const pct = (a: number, b: number) => (b > 0 ? `${Math.min(999, Math.round((a / b) * 100))}%` : "–");
+  return (
+    <div className="grid grid-cols-2 gap-3 mt-1">
+      <RingTile cor="var(--s3)" label="Treinos na semana" value={ws.feitos} max={Math.max(1, ws.previstos)} centro={`${ws.feitos}/${ws.previstos}`} sub={ws.previstos ? `${ws.feitos} de ${ws.previstos}` : "defina em Plano"} />
+      <RingTile cor="var(--s1)" label="Séries na semana" value={seriesFeitas} max={Math.max(1, seriesAlvo)} centro={pct(seriesFeitas, seriesAlvo)} sub={`${seriesFeitas} de ${seriesAlvo}`} />
+      <RingTile cor="var(--s2)" label="Cardio na semana" value={feito.cardio} max={Math.max(1, al.cardioMin)} centro={pct(feito.cardio, al.cardioMin)} sub={`${feito.cardio} de ${al.cardioMin} min`} />
+      <RingTile cor="var(--s4)" label="Água de hoje" value={aguaHoje} max={Math.max(1, ag.metaMl)} centro={pct(aguaHoje, ag.metaMl)} sub={`${fmtAgua(aguaHoje)} de ${fmtAgua(ag.metaMl)}`} />
+    </div>
   );
 }
 
