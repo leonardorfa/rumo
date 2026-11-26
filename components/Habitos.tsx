@@ -7,10 +7,11 @@ import {
   addAgua, aplicarObjetivo, OBJETIVOS, ALVOS_PADRAO, alvosOf, aguaMarcos, aguaOf, aguaSemana, AGUA_PADRAO, buildAguaIcs, feitoNaSemana, fmtAgua, GRUPOS, pesoLevantado, setAgua, setAlvos,
 } from "@/lib/life";
 import { update, useData } from "@/lib/store";
+import { Equivalencia, LinhaEquivalencia, MinhasComparacoes } from "./Equivalencia";
 import { Button, Card, Expandir, Progress, Section, Sheet, toast } from "./ui";
+import { fmtPeso } from "@/lib/pesos";
 
 const parse = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", "."));
-const kg = (v: number) => `${v.toLocaleString("pt-BR")} kg`;
 
 /** Água do dia: barra, pontos "1 L até 12:00" e a semana. */
 export function AguaCard() {
@@ -169,22 +170,46 @@ function AlvosConfig({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** Na aba Hoje: quanto você levantou na semana e desde o começo, com o desenho do equivalente. */
+export function PesoResumo() {
+  const d = useData();
+  const p = pesoLevantado(d);
+  if (!p.total) return null;
+  return (
+    <>
+      <Section>Peso levantado</Section>
+      <div className="flex flex-col gap-3">
+        <Equivalencia titulo="Esta semana" kg={p.semana} />
+        <Equivalencia titulo="Total, desde o começo" kg={p.total} />
+      </div>
+    </>
+  );
+}
+
 /** Peso total levantado (kg × repetições) por período, só de curiosidade. */
 export function PesoLevantado() {
   const d = useData();
   const p = pesoLevantado(d);
-  const linhas: [string, number][] = [["Hoje", p.dia], ["Esta semana", p.semana], ["Este mês", p.mes], ["Este ano", p.ano], ["Desde o começo", p.total]];
+  const linhas: [string, number][] = [["Hoje", p.dia], ["Este mês", p.mes], ["Este ano", p.ano]];
   return (
     <>
       <Section>Peso total levantado</Section>
-      <Card>
-        <div className="divide-y divide-line">
-          {linhas.map(([n, v]) => (
-            <div key={n} className="flex justify-between py-2"><span className="text-ink2">{n}</span><span className="font-semibold">{kg(v)}</span></div>
-          ))}
-        </div>
-        <div className="text-[12px] text-ink3 mt-2">Cada série vale carga × repetições. É só curiosidade, não entra em meta.</div>
-      </Card>
+      <div className="flex flex-col gap-3">
+        <Equivalencia titulo="Esta semana" kg={p.semana} />
+        <Equivalencia titulo="Total, desde o começo" kg={p.total} />
+        <Card>
+          <div className="divide-y divide-line">
+            {linhas.map(([n, v]) => (
+              <div key={n} className="py-2">
+                <div className="flex justify-between"><span className="text-ink2">{n}</span><span className="num font-semibold">{fmtPeso(v)}</span></div>
+                <LinhaEquivalencia kg={v} className="block text-[13px] text-ink3" />
+              </div>
+            ))}
+          </div>
+          <div className="text-[12px] text-ink3 mt-2">Cada série vale carga × repetições. Os pesos das comparações são aproximados. É só curiosidade, não entra em meta.</div>
+        </Card>
+      </div>
+      <MinhasComparacoes />
     </>
   );
 }

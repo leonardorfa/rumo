@@ -13,6 +13,8 @@ import type { Data, Tx } from "@/lib/types";
 import { cdbRende, cdbSerie } from "@/lib/cdb";
 import { Bars3D, CategoryBars, CategoryDonut, CumulativeChart, FluxoChart, type CatDatum } from "./charts";
 import { StatCard } from "./Destaques";
+import { CoresSheet } from "./Cores";
+import { fatiasDoDinheiro } from "@/lib/cores";
 import { noLucroAlvo, posicao } from "@/lib/cripto";
 import { TxList, TxRow, TxSheet } from "./Tx";
 import Revisar from "./Revisar";
@@ -115,8 +117,8 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
           {staleDays !== null && staleDays > 7 ? " ⚠︎" : ""}
         </div>
 
-        {/* A conta fatiada: quanto ali é seu e quanto é do pai */}
-        <SplitBar account={account} pai={pai} />
+        {/* A barra do dinheiro: seu, do pai e a receber, nas cores que você escolher */}
+        <SplitBar account={account} pai={pai} pessoas={parts.pessoas} />
 
         <div className="grid grid-cols-2 gap-3 mt-4 text-left">
           <div className="rounded-2xl bg-white/[.07] border border-white/[.14] p-3">
@@ -147,14 +149,14 @@ export default function Home({ month, setMonth, hidden, setHidden, goExtrato, go
           )}
           {parts.paiGuardado > 0 && (
             <button onClick={goPai} className="rounded-2xl bg-white/[.07] border border-white/[.14] p-3 col-span-2 text-left">
-              <div className="text-[12px] text-white/70">Você deve ao seu pai</div>
+              <div className="text-[12px] text-white/70 flex items-center gap-1.5"><i className="w-2 h-2 rounded-full" style={{ background: "var(--barra-pai)" }} aria-hidden />Você deve ao seu pai</div>
               <Money v={parts.paiGuardado} className="font-bold" />
               <div className="text-[12px] text-white/70">está na sua conta, mas é dele: fica fora do total</div>
             </button>
           )}
           {parts.aReceber > 0 && (
             <div className="rounded-2xl bg-white/[.07] border border-white/[.14] p-3 col-span-2">
-              <div className="text-[12px] text-white/70">A receber</div>
+              <div className="text-[12px] text-white/70 flex items-center gap-1.5"><i className="w-2 h-2 rounded-full" style={{ background: `var(--barra-${parts.pessoas > 0 ? "devem" : "pai"})` }} aria-hidden />A receber</div>
               <Money v={parts.aReceber} className="font-bold" />
               <div className="text-[12px] text-white/70">
                 {[parts.doPai > 0 ? <span key="p">seu pai te deve <Money v={parts.doPai} /></span> : null,
@@ -445,24 +447,29 @@ function Goal({ label, pct, color, over }: { label: string; pct: number; color: 
   );
 }
 
-/** A conta inteira como uma barra: parte azul é sua, parte laranja é do pai. */
-function SplitBar({ account, pai }: { account: number; pai: number }) {
-  const owed = pai < 0; // pai te deve: tudo na conta é seu, e ainda tem a receber
-  const total = owed ? account - pai : Math.max(account, 1);
-  const w = (v: number) => `${Math.max(0, Math.min(100, (v / total) * 100))}%`;
+/** O dinheiro em uma barra: o que é seu, o que é do pai e o que ainda vão te pagar (listrado). Toque para trocar as cores. */
+function SplitBar({ account, pai, pessoas }: { account: number; pai: number; pessoas: number }) {
+  const [cores, setCores] = useState(false);
+  const fatias = fatiasDoDinheiro(account, pai, pessoas);
+  const total = fatias.reduce((a, f) => a + f.valor, 0) || 1;
+  const cor = (q: string) => `var(--barra-${q})`;
+  const aReceber = (k: string) => k === "paiDeve" || k === "devem";
   return (
     <div className="mt-4">
-      <div className="flex h-2.5 rounded-full overflow-hidden gap-[2px] bg-white/15" aria-hidden>
-        <div style={{ width: w(owed ? account : account - pai), background: "var(--meu)" }} />
-        {owed
-          ? <div style={{ width: w(-pai), background: "repeating-linear-gradient(135deg, var(--pai) 0 4px, transparent 4px 8px)" }} />
-          : <div style={{ width: w(pai), background: "var(--pai)" }} />}
+      <button onClick={() => setCores(true)} className="block w-full py-1" aria-label="Barra do dinheiro. Toque para escolher as cores">
+        <span className="flex h-3 rounded-full overflow-hidden gap-[2px] bg-white/15" aria-hidden>
+          {fatias.filter((f) => f.valor > 0).map((f) => (
+            <span key={f.k} style={{ width: `${(f.valor / total) * 100}%`, background: aReceber(f.k) ? `repeating-linear-gradient(135deg, ${cor(f.quem)} 0 4px, color-mix(in srgb, ${cor(f.quem)} 35%, transparent) 4px 8px)` : cor(f.quem) }} />
+          ))}
+        </span>
+      </button>
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-[12px] text-white/70 mt-1">
+        {fatias.map((f) => (
+          <span key={f.k} className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full" style={{ background: cor(f.quem) }} />{f.rotulo} <Money v={f.valor} className="text-white" /></span>
+        ))}
       </div>
-      <div className="flex justify-between text-[12px] text-white/70 mt-1.5">
-        <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full" style={{ background: "var(--meu)" }} />Seu</span>
-        <span>Conta: <Money v={account} className="text-white" /></span>
-        <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full" style={{ background: "var(--pai)" }} />{owed ? "Pai te deve" : "Do pai"}</span>
-      </div>
+      <div className="text-[12px] text-white/60 mt-1">Na conta: <Money v={account} className="text-white/90" /> · <button className="underline" onClick={() => setCores(true)}>cores</button></div>
+      {cores && <CoresSheet onClose={() => setCores(false)} />}
     </div>
   );
 }

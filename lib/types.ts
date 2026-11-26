@@ -57,6 +57,7 @@ export interface Prefs {
   countInvoices: boolean; // a fatura do cartão em aberto desconta do "meu dinheiro"
   anim: boolean; // animações e gráficos 3D
   splash: boolean; // animação de abertura (planeta e órbita) ao abrir o app
+  cores?: { meu?: string; devem?: string; pai?: string }; // cores (#rrggbb) que você escolheu para o dinheiro
   birth: string; // data de nascimento (YYYY-MM-DD), para as metas por idade
   returnPct: number; // retorno esperado ao ano, para as metas de longo prazo
   payday: number; // dia do salário (0 = descobrir pelo extrato)
@@ -126,6 +127,8 @@ export interface Goal {
   returnPct?: number; // net: retorno esperado ao ano (senão o padrão de Ajustes)
 }
 
+/** Uma coisa para comparar com o peso levantado. */
+export interface Coisa { nome: string; plural: string; emoji: string; kg: number }
 export interface Agua {
   metaMl: number; // por dia
   horarios: string[]; // "12:00": a meta do dia é dividida igual entre eles (lembretes)
@@ -154,6 +157,7 @@ export interface Workout {
   note?: string;
   cardio?: Cardio; // o que você fez de cardio
   sets: { ex: string; kg: number; reps: number }[];
+  nome?: string; // nome do treino quando a rotina dele não existe mais
   pend?: string[]; // exercícios do treino que ainda não têm série anotada (continuam ali ao editar)
 }
 /** O que muda num dia da semana em relação à rotina (ex.: sábado com ênfase em ombro). */
@@ -164,6 +168,8 @@ export interface Fit {
   weights: { date: string; kg: number }[];
   days: Record<string, string>; // "0" domingo … "6" sábado → id da rotina ("" = treino sem rotina); ausente = descanso
   dayExtra?: Record<string, DayExtra>; // ajustes de cada dia (ênfase, tempo, cardio, exercícios a mais)
+  semPredefinidos?: boolean; // os treinos pré-definidos antigos já foram tirados
+  coisas?: Coisa[]; // comparações de peso que você criou
   exDistintos?: string[]; // pares de exercícios de nome parecido que você disse que são diferentes ("a|b")
   exGroups?: Record<string, string>; // grupo muscular dos exercícios que você criou
   agua?: Agua; // meta de água e o que você bebeu

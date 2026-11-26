@@ -5,6 +5,7 @@ import { daysInMonth, localDay, monthName, shiftMonth } from "@/lib/format";
 import { aguaOf, exerciciosDoTreino, fmtAgua, resumoDoDia, WEEKDAYS } from "@/lib/life";
 import { useData } from "@/lib/store";
 import type { Workout } from "@/lib/types";
+import { LinhaEquivalencia } from "./Equivalencia";
 import { Button, Card, Progress, Sheet } from "./ui";
 
 const num = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
@@ -84,9 +85,10 @@ export default function CalendarioTreino({ onClose, onEditar }: { onClose: () =>
             return (
               <div key={w.id} className="mb-3 last:mb-0">
                 <div className="flex justify-between text-[14px]">
-                  <span className="font-semibold">{rot?.name ?? "Treino livre"}</span>
+                  <span className="font-semibold">{rot?.name ?? w.nome ?? "Treino livre"}</span>
                   <span className="text-ink3">{w.sets.length} séries · {num(w.sets.reduce((a, s) => a + s.kg * s.reps, 0))} kg</span>
                 </div>
+                <LinhaEquivalencia kg={w.sets.reduce((a, s) => a + s.kg * s.reps, 0)} className="block text-[13px] text-ink2" />
                 <div className="divide-y divide-line mt-1">
                   {exs.map((e) => (
                     <div key={e.ex} className="py-1.5 text-[14px]">

@@ -19,6 +19,8 @@ Leia também o `HANDOFF.md` (contexto e pendências) e o `README.md` (como rodar
 - Janelas (`Sheet`) vão para o `<body>` por portal; nunca prender uma janela fixa dentro de um cartão com animação.
 - Visual (nov/2026): vidro escuro com brilho. Cores e vidros ficam em tokens em `app/globals.css` (`--card-glass`, `--line`, `--s1` a `--s6`); gráficos usam `<defs>` direto dentro do Recharts; a abertura do app (`components/Abertura.tsx`) respeita "reduzir movimento" e a preferência em Mais.
 - Peças do painel reutilizáveis ficam em `components/Destaques.tsx` (`StatCard`, `RingTile`, `Ring`, `Pill`, `Brilho`): use nas telas novas em vez de recriar cartões.
+- Não existem treinos pré-definidos: só o treino livre e as rotinas que o usuário criar (`lib/predefinidos.ts` tira os antigos). Não recriar modelos prontos.
+- As cores do dinheiro (seu, quem te deve, pai) são do usuário: usar `--barra-meu`, `--barra-devem`, `--barra-pai` (`lib/cores.ts`), nunca cor fixa nessas partes.
 - Antes de publicar: `npm run check` e `npm run build`.
 
 ## Registro de regressões

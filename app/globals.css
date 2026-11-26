@@ -250,3 +250,6 @@ html[data-splash="off"] .abertura { display: none; }
 
 /* o cartão principal mantém o degradê azul (a regra do vidro escuro tem mais peso, então repetimos aqui) */
 :root .hero.card, :root:not([data-theme="light"]) .hero.card, :root[data-theme="dark"] .hero.card { background: var(--hero); }
+
+/* cores das partes do dinheiro; o que você escolher em Cores sobrescreve estas */
+:root { --barra-meu: var(--meu); --barra-devem: var(--s3); --barra-pai: var(--pai); }

@@ -15,6 +15,7 @@ import { Card, FilePick, HideCtx, Icons, Toaster, toast } from "@/components/ui"
 import { restoreFile } from "@/lib/backup";
 import { setAnimOn } from "@/lib/anim";
 import { refreshCdi } from "@/lib/cdi";
+import { coresVars } from "@/lib/cores";
 import { latestMonth } from "@/lib/stats";
 import { getData, useData } from "@/lib/store";
 
@@ -41,6 +42,11 @@ export default function App() {
   const [aberto, setAberto] = useState(false); // passou pela trava
 
   // animações: sua preferência e o "reduzir movimento" do iPhone
+  // cores que você escolheu para o dinheiro (as não escolhidas seguem o tema)
+  useEffect(() => {
+    const raiz = document.documentElement.style;
+    for (const [nome, valor] of Object.entries(coresVars(d.config.prefs.cores))) valor ? raiz.setProperty(nome, valor) : raiz.removeProperty(nome);
+  }, [d.config.prefs.cores]);
   const animPref = d.config.prefs.anim;
   useEffect(() => {
     const reduz = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;

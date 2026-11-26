@@ -15,6 +15,7 @@ import type { Bill, Config } from "@/lib/types";
 import { exportCsv, restoreFile, saveBackup } from "@/lib/backup";
 import { brl, localDay } from "@/lib/format";
 import { CHAVE_ABERTURA } from "./Abertura";
+import { CoresSheet } from "./Cores";
 import { Button, Card, FilePick, Money, Section, Segmented, Sheet, Title, toast } from "./ui";
 
 const PW_KEY = "pdf-password";
@@ -340,6 +341,7 @@ function Settings({ cfg, goCdb }: { cfg: Config; goCdb: () => void }) {
   const d = useData();
   const p = cfg.prefs;
   const [iaTick, setIaTick] = useState(0);
+  const [coresAbertas, setCoresAbertas] = useState(false);
   const ia = useMemo(() => aiConfig(), [iaTick]); // eslint-disable-line react-hooks/exhaustive-deps
   const setP = (patch: Partial<Config["prefs"]>) => set({ prefs: { ...p, ...patch } });
   const num = (key: "returnPct" | "avgMonths" | "economyPct" | "areasCount" | "alertPct" | "backupDays" | "payday", label: string, hint: string, min: number, max: number, suf: string) => (
@@ -357,6 +359,7 @@ function Settings({ cfg, goCdb }: { cfg: Config; goCdb: () => void }) {
     : "ainda não buscou: abra o app com internet (usando estimativa por enquanto)";
   return (
     <>
+      {coresAbertas && <CoresSheet onClose={() => setCoresAbertas(false)} />}
       <Group title="Personalizar" note="Tudo aqui é gosto seu: mude quando quiser.">
         <Row label="Seu nome" value={p.name || "—"} onClick={() => setForm({
           title: "Seu nome", fields: [{ key: "v", label: "Como o app te chama (as 2 primeiras letras viram o ícone)", kind: "text", value: p.name }],
@@ -367,6 +370,7 @@ function Settings({ cfg, goCdb }: { cfg: Config; goCdb: () => void }) {
         <Row label="Fatura do cartão em aberto desconta do meu dinheiro" sub={p.countInvoices ? "ligado: a fatura importada e não paga sai do disponível" : "desligado: a fatura não mexe em nada (o pagamento aparece no extrato)"} value={p.countInvoices ? "sim" : "não"} onClick={() => setP({ countInvoices: !p.countInvoices })} />
         <Row label="Atualizar cotações ao abrir Cripto" sub="consulta a Coinbase e envia só o símbolo da moeda (SOL, BTC…)" value={p.autoCotacao ? "sim" : "não"} onClick={() => setP({ autoCotacao: !p.autoCotacao })} />
         <Row label="Cripto conta no meu dinheiro" value={p.countCripto ? "sim" : "não"} onClick={() => setP({ countCripto: !p.countCripto })} />
+        <Row label="Cores do dinheiro" sub="a sua, a de quem te deve e a do seu pai" value="escolher" onClick={() => setCoresAbertas(true)} />
         <Row label="Animação de abertura (planeta e órbita)" value={p.splash ? "sim" : "não"} onClick={() => { setP({ splash: !p.splash }); try { localStorage.setItem(CHAVE_ABERTURA, !p.splash ? "1" : "0"); } catch { /* ok */ } }} />
         <Row label="Animações e gráficos 3D" value={p.anim ? "sim" : "não"} onClick={() => setP({ anim: !p.anim })} />
         <Row label="Data de nascimento" value={p.birth ? new Date(p.birth + "T12:00:00").toLocaleDateString("pt-BR") : "informar"} onClick={() => setForm({

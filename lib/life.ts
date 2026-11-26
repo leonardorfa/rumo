@@ -1,6 +1,7 @@
 // Metas de vida e treino. Só regra e conta, sem IA; os dados moram em Data.goals e Data.fit.
 import { localDay } from "./format";
 import { netWorthHistory } from "./insights";
+import { semPredefinidos } from "./predefinidos";
 import { myMoney } from "./store";
 import type { Cardio, CdbTranche, Cripto, Data, DayExtra, Fit, Goal, Routine, Workout } from "./types";
 
@@ -330,13 +331,6 @@ export const SUGESTOES = [
   "Abdominal",
 ];
 
-/** Modelos para começar: você adiciona e muda do seu jeito. */
-export const MODELOS: { name: string; focus: string; exercises: string[] }[] = [
-  { name: "Peito, tríceps e ombro", focus: "Peito", exercises: ["Supino na máquina", "Crucifixo", "Tríceps corda", "Tríceps francês", "Elevação lateral na máquina"] },
-  { name: "Costas e bíceps", focus: "Costas", exercises: ["Puxada na barra", "Puxada no triângulo", "Puxada na máquina", "Remada", "Rosca Scott na máquina", "Rosca martelo"] },
-  { name: "Perna", focus: "Perna", exercises: ["Leg press", "Cadeira extensora", "Agachamento hack", "Panturrilha no hack"] },
-];
-
 // ---------- agenda (.ics) ----------
 
 const ICS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
@@ -436,6 +430,8 @@ export function importSetup(d: Data, json: unknown): { data: Data; metas: number
     const atuais = out.cripto ?? [];
     out = { ...out, cripto: [...atuais, ...moedas.filter((m) => !atuais.some((a) => a.id === m.id))] };
   }
+  // treinos pré-definidos que venham num arquivo antigo não voltam
+  if (j.fit?.routines?.length) out = semPredefinidos({ ...out, fit: { ...fitOf(out), semPredefinidos: false } });
   return { data: out, metas: novas.length, pesos: pesos.length, aplicacoes };
 }
 
@@ -608,6 +604,8 @@ export function parecidosCom(d: Data, nome: string): string[] {
   const todos = [...new Map([...knownExercises(d), ...SUGESTOES].map((e) => [norm(e), e])).values()];
   return todos.filter((c) => norm(c) !== norm(nome) && exParecidos(nome, c) && !dist.includes(chaveDistinto(nome, c)));
 }
+/** Mesmo exercício, ignorando acento, maiúscula e espaço. */
+export const mesmoEx = (a: string, b: string) => norm(a) === norm(b);
 /** Pares de exercícios seus com nome parecido, para você juntar ou dizer que são diferentes. */
 export function paresParecidos(d: Data): [string, string][] {
   const dist = fitOf(d).exDistintos ?? [];

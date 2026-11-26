@@ -633,15 +633,15 @@ console.log("saldo e partes ok");
   v = L.saveRoutine(v, { id: "rot-sab", name: "Peito (sábado)", exercises: ["Crucifixo", "Supino na máquina"] });
   v = L.setTrainingDay(L.setTrainingDay(v, 2, "rot-ter"), 6, "rot-sab");
   v = L.saveWorkout(v, { id: "w1", date: "2026-11-03", routineId: "rot-ter", sets: [{ ex: "Crucifixo", kg: 20, reps: 10 }] });
-  const arq = { fit: { replace: true, remap: { "rot-ter": "rot-peito", "rot-sab": "rot-peito" },
-    routines: [{ id: "rot-peito", name: "Peito, tríceps e ombro", exercises: ["Supino na máquina", "Crucifixo"], cardio: { tipo: "Bike", min: 20 } }, { id: "rot-perna", name: "Perna", exercises: ["Leg press"] }],
-    days: { "2": "rot-peito", "6": "rot-peito", "4": "rot-perna" },
+  const arq = { fit: { replace: true, remap: { "rot-ter": "r-a", "rot-sab": "r-a" },
+    routines: [{ id: "r-a", name: "Treino A", exercises: ["Supino na máquina", "Crucifixo"], cardio: { tipo: "Bike", min: 20 } }, { id: "r-b", name: "Treino B", exercises: ["Leg press"] }],
+    days: { "2": "r-a", "6": "r-a", "4": "r-b" },
     dayExtra: { "6": { focus: "Ombro", minutes: 90, extra: ["Elevação lateral com halter", "Crucifixo"] }, "2": { minutes: 60 } } } };
   const r = L.importSetup(v, arq).data;
-  assert.deepEqual(L.fitOf(r).routines.map((x) => x.name), ["Peito, tríceps e ombro", "Perna"], "ficam só as 3 rotinas do arquivo");
-  assert.equal(L.fitOf(r).workouts[0].routineId, "rot-peito", "o treino já feito vai para a rotina nova");
+  assert.deepEqual(L.fitOf(r).routines.map((x) => x.name), ["Treino A", "Treino B"], "ficam só as 3 rotinas do arquivo");
+  assert.equal(L.fitOf(r).workouts[0].routineId, "r-a", "o treino já feito vai para a rotina nova");
   const sab = L.planForDay(r, 6)!;
-  assert.deepEqual([sab.name, sab.focus, sab.minutes, sab.cardio?.min], ["Peito, tríceps e ombro", "Ombro", 90, 20]);
+  assert.deepEqual([sab.name, sab.focus, sab.minutes, sab.cardio?.min], ["Treino A", "Ombro", 90, 20]);
   assert.deepEqual(sab.exercises, ["Supino na máquina", "Crucifixo", "Elevação lateral com halter"], "extras do dia entram sem repetir");
   const ter = L.planForDay(r, 2)!;
   assert.deepEqual([ter.focus, ter.minutes, ter.exercises.length], [undefined, 60, 2], "terça: 60 min, sem extra");
@@ -1052,3 +1052,73 @@ console.log("fluxo do mês ok");
   assert.ok(!/<Gradientes/.test(fs.readFileSync("components/charts.tsx", "utf8")), "defs dos gráficos não podem estar dentro de um componente (as colunas ficavam invisíveis)");
 }
 console.log("abertura e visual ok");
+
+// ---- 2026-11-26: sem treinos pré-definidos, corrigir nome de exercício e peso equivalente ----
+{
+  const L = require("../lib/life") as typeof import("../lib/life");
+  const P = require("../lib/predefinidos") as typeof import("../lib/predefinidos");
+  const W = require("../lib/pesos") as typeof import("../lib/pesos");
+  const St = require("../lib/store") as typeof import("../lib/store");
+  const d0 = { version: 1, txs: [], father: [], rules: [], config: DEFAULT_CONFIG, lastBackup: null } as unknown as Data;
+  // os três treinos prontos saem; os seus ficam; os dias continuam de treino (livre); o histórico guarda o nome
+  let d = L.saveRoutine(d0, { id: "rot-peito", name: "Peito, tríceps e ombro", exercises: ["Crucifixo"] });
+  d = L.saveRoutine(d, { id: "x1", name: "Perna", exercises: ["Leg press"] });
+  d = L.saveRoutine(d, { id: "meu", name: "Meu treino de sábado", exercises: ["Remada baixa"] });
+  d = L.setTrainingDay(L.setTrainingDay(d, 2, "rot-peito"), 6, "meu");
+  d = L.setDayExtra(d, 2, { focus: "Peito" });
+  d = L.saveWorkout(d, { id: "w", date: "2026-11-10", routineId: "rot-peito", sets: [{ ex: "Crucifixo", kg: 20, reps: 10 }] });
+  const limpo = P.semPredefinidos(d);
+  const f = L.fitOf(limpo);
+  assert.deepEqual(f.routines.map((r) => r.id), ["meu"]);
+  assert.deepEqual(f.days, { "2": "", "6": "meu" }, "o dia continua de treino, como livre");
+  assert.equal(f.dayExtra?.["2"], undefined, "o ajuste do treino pronto sai junto");
+  assert.deepEqual([f.workouts[0].routineId, f.workouts[0].nome], [undefined, "Peito, tríceps e ombro"]);
+  // só uma vez: uma rotina que você criar depois com esses nomes fica
+  const depois = L.saveRoutine(limpo, { id: "novo", name: "Perna", exercises: [] });
+  assert.equal(L.fitOf(P.semPredefinidos(depois)).routines.length, 2, "não apaga o que você criar depois");
+  // restaurar backup antigo também tira; importar o arquivo de metas antigo não traz de volta
+  assert.deepEqual(L.fitOf(St.parseBackup(JSON.stringify({ ...d, version: 1 })).data).routines.map((r) => r.id), ["meu"]);
+  const arq = { fit: { replace: true, routines: [{ id: "rot-costas", name: "Costas e bíceps", exercises: ["Remada baixa"] }], days: { "5": "rot-costas" } } };
+  const imp = L.importSetup(limpo, arq).data;
+  assert.deepEqual([L.fitOf(imp).routines.length, L.fitOf(imp).days["5"]], [0, ""]);
+  assert.ok(!("MODELOS" in L), "não existem mais modelos prontos");
+
+  // corrigir o nome de uma máquina: muda no histórico e nas rotinas, inclusive só a maiúscula
+  let e = L.saveRoutine(d0, { id: "r", name: "R", exercises: ["Maquina errada"] });
+  e = L.saveWorkout(e, { id: "w", date: "2026-11-10", sets: [{ ex: "Maquina errada", kg: 10, reps: 10 }] });
+  e = L.setExGroup(e, "Maquina errada", "Perna");
+  const certo = L.juntarExercicios(e, "Maquina errada", "Cadeira adutora");
+  assert.deepEqual([L.fitOf(certo).workouts[0].sets[0].ex, L.fitOf(certo).routines[0].exercises[0], L.fitOf(certo).exGroups?.["Cadeira adutora"]], ["Cadeira adutora", "Cadeira adutora", "Perna"]);
+  const caixa = L.juntarExercicios(e, "Maquina errada", "Máquina errada");
+  assert.deepEqual([L.fitOf(caixa).workouts[0].sets[0].ex, L.fitOf(caixa).routines[0].exercises, L.fitOf(caixa).exGroups?.["Máquina errada"]], ["Máquina errada", ["Máquina errada"], "Perna"]);
+
+  // equivalências de peso
+  const c = W.coisasOf(d0);
+  assert.ok(c.every((x, i) => !i || x.kg >= c[i - 1].kg), "em ordem de peso");
+  assert.equal(W.equivalente(c, 3).coisa, null);
+  assert.equal(W.equivalente(c, 6000).frase, "1 elefante africano");
+  assert.equal(W.equivalente(c, 12000).frase, "1 ônibus");
+  assert.equal(W.equivalente(c, 3000).frase, "1,3 rinoceronte", "plural só a partir de 2");
+  assert.equal(W.equivalente(c, 70000).frase, "1,7 avião de passageiros (vazio)");
+  assert.equal(W.equivalente(c, 1000).prox?.nome, "hipopótamo");
+  assert.equal(W.equivalente(c, 1000).falta, 500);
+  assert.equal(W.fmtPeso(740), "740 kg");
+  assert.equal(W.fmtPeso(3450), "3,45 t");
+  const com = W.salvarCoisa(d0, { nome: "moto", plural: "motos", emoji: "🏍️", kg: 150 });
+  assert.equal(W.equivalente(W.coisasOf(com), 160).frase, "1,1 moto", "comparação sua entra na lista");
+  assert.equal(W.coisasOf(W.apagarCoisa(com, "moto")).length, W.COISAS.length);
+}
+console.log("treinos prontos, nomes e pesos ok");
+
+// ---- 2026-11-26: cores do dinheiro ----
+{
+  const K = require("../lib/cores") as typeof import("../lib/cores");
+  assert.deepEqual(K.coresVars(undefined), { "--barra-meu": null, "--barra-devem": null, "--barra-pai": null, "--pai": null }, "sem escolha vale o tema");
+  assert.deepEqual(K.coresVars({ meu: "#112233", pai: "#abcdef", devem: "vermelho" }), { "--barra-meu": "#112233", "--barra-devem": null, "--barra-pai": "#abcdef", "--pai": "#abcdef" }, "cor inválida é ignorada");
+  // conta 1000, 300 são do pai, outros devem 200
+  assert.deepEqual(K.fatiasDoDinheiro(1000, 300, 200).map((f) => [f.k, f.valor]), [["meu", 700], ["pai", 300], ["devem", 200]]);
+  // pai deve 500: tudo na conta é seu e a dívida dele aparece à parte
+  assert.deepEqual(K.fatiasDoDinheiro(1000, -500, 0).map((f) => [f.k, f.valor, f.quem]), [["meu", 1000, "meu"], ["paiDeve", 500, "pai"]]);
+  assert.deepEqual(K.fatiasDoDinheiro(100, 300, 0).map((f) => [f.k, f.valor]), [["meu", 0], ["pai", 300]], "conta menor que o dinheiro do pai não fica negativa");
+}
+console.log("cores do dinheiro ok");
