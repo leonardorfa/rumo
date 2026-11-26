@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { shareFile } from "@/lib/backup";
 import { localDay } from "@/lib/format";
 import {
-  rascunhoChave, seriesFaltando, parecidosCom, marcarDistintos, paresParecidos, juntarExercicios, alvosOf, aguaOf, feitoNaSemana, fmtAgua, mesmoEx, agrupar, buildIcs, deleteRoutine, GRUPOS, grupoDaRotina, grupoDe, setExGroup, planForDay, setDayExtra, deleteWeight, deleteWorkout, exerciseHistory, fitOf, goalStatus, knownExercises, lastSets, logWeight,
+  rascunhoChave, seriesFaltando, parecidosCom, marcarDistintos, paresParecidos, juntarExercicios, alvosOf, aguaOf, feitoNaSemana, fmtAgua, mesmoEx, juntarVarios, seriesDoExercicio, agrupar, buildIcs, deleteRoutine, GRUPOS, grupoDaRotina, grupoDe, setExGroup, planForDay, setDayExtra, deleteWeight, deleteWorkout, exerciseHistory, fitOf, goalStatus, knownExercises, lastSets, logWeight,
   recordsOf, saveRoutine, saveWorkout, setTrainingDay, setTrainingTime, SUGESTOES, weekStats, weeklyVolume, weightTrend, WEEKDAYS,
 } from "@/lib/life";
 import { update, useData } from "@/lib/store";
@@ -22,6 +22,7 @@ const parse = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", "."));
 const dataBR = (iso: string) => iso.split("-").reverse().join("/");
 const num = (v: number, max = 1) => v.toLocaleString("pt-BR", { maximumFractionDigits: max });
 const ORDEM = [1, 2, 3, 4, 5, 6, 0]; // segunda a domingo
+const contaSeries = (n: number) => `${n} série${n === 1 ? "" : "s"}`;
 
 export default function Treino() {
   const [aba, setAba] = useState<Aba>(() => {
@@ -610,26 +611,76 @@ function PainelDoTreino() {
 function MeusExercicios() {
   const d = useData();
   const [aberto, setAberto] = useState<string | null>(null);
+  const [juntando, setJuntando] = useState(false);
+  const [marcados, setMarcados] = useState<string[]>([]);
+  const [confirmar, setConfirmar] = useState(false);
   const meus = knownExercises(d);
   if (!meus.length) return null;
+  const escolhidos = marcados.filter((m) => meus.includes(m));
+  const sair = () => { setJuntando(false); setMarcados([]); setConfirmar(false); };
+  const marcar = (e: string) => setMarcados((m) => (m.includes(e) ? m.filter((x) => x !== e) : [...m, e]));
   return (
     <>
-      <Section>Meus exercícios</Section>
-      <div className="text-[13px] text-ink3 px-1 mb-2">Toque para corrigir o nome ou o grupo. A mudança vale para o histórico inteiro.</div>
+      <Section action={meus.length > 1 ? <button onClick={() => (juntando ? sair() : setJuntando(true))} className="text-link text-[15px] font-semibold">{juntando ? "Cancelar" : "Juntar"}</button> : undefined}>Meus exercícios</Section>
+      <div className="text-[13px] text-ink3 px-1 mb-2">
+        {juntando ? "Marque 2 ou mais que são o mesmo exercício com nomes diferentes." : "Toque para corrigir o nome ou o grupo. A mudança vale para o histórico inteiro."}
+      </div>
       <div className="card px-4">
         {agrupar(meus, (e) => grupoDe(d, e)).map((g) => (
           <div key={g.grupo}>
             <div className="text-[12px] font-semibold text-ink3 uppercase tracking-wide pt-3">{g.grupo}</div>
             {g.itens.map((e) => (
-              <button key={e} onClick={() => setAberto(e)} className="w-full flex items-center gap-3 py-3 text-left border-t border-line first:border-t-0">
-                <span className="flex-1 min-w-0 truncate">{e}</span><span className="text-ink3" aria-hidden>✎</span>
+              <button key={e} onClick={() => (juntando ? marcar(e) : setAberto(e))} aria-pressed={juntando ? escolhidos.includes(e) : undefined}
+                className="w-full flex items-center gap-3 py-3 text-left border-t border-line first:border-t-0">
+                {juntando && <span className={`w-6 h-6 shrink-0 rounded-full grid place-items-center text-[13px] ${escolhidos.includes(e) ? "bg-ok text-[#031a14]" : "border-2 border-line text-transparent"}`} aria-hidden>✓</span>}
+                <span className="flex-1 min-w-0 truncate">{e}</span>
+                {juntando ? <span className="text-[12px] text-ink3 shrink-0">{contaSeries(seriesDoExercicio(d, e))}</span> : <span className="text-ink3" aria-hidden>✎</span>}
               </button>
             ))}
           </div>
         ))}
       </div>
+      {juntando && (
+        <div className="sticky bottom-24 z-30 mt-3">
+          <Button tone="primary" className="w-full" disabled={escolhidos.length < 2} onClick={() => setConfirmar(true)}>
+            {escolhidos.length < 2 ? "Marque pelo menos 2" : `Juntar ${escolhidos.length} exercícios`}
+          </Button>
+        </div>
+      )}
+      {confirmar && escolhidos.length >= 2 && <JuntarSheet nomes={escolhidos} onClose={() => setConfirmar(false)} onFeito={sair} />}
       {aberto && <ExercicioSheet nome={aberto} onClose={() => setAberto(null)} />}
     </>
+  );
+}
+
+/** Escolher o nome que fica ao juntar os exercícios marcados. */
+function JuntarSheet({ nomes, onClose, onFeito }: { nomes: string[]; onClose: () => void; onFeito: () => void }) {
+  const d = useData();
+  // sugere o que tem mais séries anotadas
+  const [fica, setFica] = useState(() => [...nomes].sort((a, b) => seriesDoExercicio(d, b) - seriesDoExercicio(d, a))[0]);
+  const [outro, setOutro] = useState("");
+  const final = outro.trim() || fica;
+  const total = nomes.reduce((a, n) => a + seriesDoExercicio(d, n), 0);
+  return (
+    <Sheet open onClose={onClose} title="Juntar exercícios">
+      <div className="text-[13px] text-ink3 px-1 mb-1">Qual nome fica?</div>
+      <div className="card px-4 mb-3">
+        {nomes.map((n, i) => (
+          <label key={n} className={`flex items-center gap-3 py-3 ${i ? "border-t border-line" : ""}`}>
+            <input type="radio" name="fica" checked={!outro.trim() && fica === n} onChange={() => { setFica(n); setOutro(""); }} className="!w-5 !h-5 shrink-0 accent-[var(--meu)]" />
+            <span className="flex-1 min-w-0">{n}</span>
+            <span className="text-[12px] text-ink3 shrink-0">{contaSeries(seriesDoExercicio(d, n))}</span>
+          </label>
+        ))}
+      </div>
+      <label className="block mb-3"><span className="block text-[13px] text-ink3 px-1 mb-1">Ou escreva outro nome</span>
+        <input value={outro} onChange={(e) => setOutro(e.target.value)} placeholder="Nome certo" /></label>
+      <p className="text-[13px] text-ink2 px-1 mb-3">{total === 1 ? "A série fica" : `As ${total} séries ficam`} em “{final}”, no histórico e nas rotinas.</p>
+      <Button tone="primary" className="w-full" onClick={() => {
+        act(`Juntei em “${final}”`, (dd) => juntarVarios(dd, nomes, final, fica));
+        onClose(); onFeito();
+      }}>Juntar</Button>
+    </Sheet>
   );
 }
 

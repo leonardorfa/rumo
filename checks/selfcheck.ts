@@ -1122,3 +1122,25 @@ console.log("treinos prontos, nomes e pesos ok");
   assert.deepEqual(K.fatiasDoDinheiro(100, 300, 0).map((f) => [f.k, f.valor]), [["meu", 0], ["pai", 300]], "conta menor que o dinheiro do pai não fica negativa");
 }
 console.log("cores do dinheiro ok");
+
+// ---- 2026-11-26: juntar vários exercícios de uma vez ----
+{
+  const L = require("../lib/life") as typeof import("../lib/life");
+  const d0 = { version: 1, txs: [], father: [], rules: [], config: DEFAULT_CONFIG, lastBackup: null } as unknown as Data;
+  let d = L.saveRoutine(d0, { id: "r", name: "R", exercises: ["Leg 45", "Leg press", "Legpress", "Stiff"] });
+  d = L.saveWorkout(d, { id: "a", date: "2026-11-01", sets: [{ ex: "Leg press", kg: 100, reps: 10 }, { ex: "Leg press", kg: 100, reps: 8 }, { ex: "Leg 45", kg: 90, reps: 10 }] });
+  d = L.saveWorkout(d, { id: "b", date: "2026-11-08", sets: [{ ex: "Legpress", kg: 110, reps: 6 }, { ex: "Stiff", kg: 40, reps: 10 }], pend: ["Leg 45"] });
+  d = L.setExGroup(d, "Leg press", "Perna");
+  assert.equal(L.seriesDoExercicio(d, "Leg press"), 2);
+  const j = L.juntarVarios(d, ["Leg 45", "Leg press", "Legpress"], "Leg press");
+  assert.deepEqual(L.knownExercises(j), ["Leg press", "Stiff"]);
+  assert.equal(L.seriesDoExercicio(j, "Leg press"), 4, "nenhuma série se perde");
+  assert.deepEqual(L.fitOf(j).routines[0].exercises, ["Leg press", "Stiff"], "a rotina não repete");
+  assert.equal(L.fitOf(j).exGroups?.["Leg press"], "Perna");
+  assert.equal(L.fitOf(j).workouts[0].sets.reduce((a, s) => a + s.kg * s.reps, 0), 2700, "o peso levantado não muda");
+  // nome novo, escrito por você: leva o grupo do escolhido
+  const n = L.juntarVarios(d, ["Leg 45", "Leg press"], "Leg press 45 graus", "Leg press");
+  assert.deepEqual([L.knownExercises(n).includes("Leg press 45 graus"), L.knownExercises(n).includes("Leg 45"), L.fitOf(n).exGroups?.["Leg press 45 graus"]], [true, false, "Perna"]);
+  assert.equal(L.juntarVarios(d, ["Leg 45"], "  "), d, "nome vazio não muda nada");
+}
+console.log("juntar vários exercícios ok");

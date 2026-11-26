@@ -604,6 +604,17 @@ export function parecidosCom(d: Data, nome: string): string[] {
   const todos = [...new Map([...knownExercises(d), ...SUGESTOES].map((e) => [norm(e), e])).values()];
   return todos.filter((c) => norm(c) !== norm(nome) && exParecidos(nome, c) && !dist.includes(chaveDistinto(nome, c)));
 }
+/** Junta vários exercícios num só nome (um dos escolhidos ou outro que você escrever). O grupo vem de `grupoDeQuem`. */
+export function juntarVarios(d: Data, nomes: string[], final: string, grupoDeQuem = final): Data {
+  const limpo = final.trim();
+  if (!limpo || !nomes.length) return d;
+  const grupo = grupoDe(d, grupoDeQuem);
+  const out = nomes.filter((n) => n !== limpo).reduce((acc, n) => juntarExercicios(acc, n, limpo), d);
+  return setExGroup(out, limpo, grupo);
+}
+/** Quantas séries já anotadas cada exercício tem (ajuda a decidir qual nome fica). */
+export const seriesDoExercicio = (d: Data, ex: string) => fitOf(d).workouts.reduce((a, w) => a + w.sets.filter((s) => norm(s.ex) === norm(ex)).length, 0);
+
 /** Mesmo exercício, ignorando acento, maiúscula e espaço. */
 export const mesmoEx = (a: string, b: string) => norm(a) === norm(b);
 /** Pares de exercícios seus com nome parecido, para você juntar ou dizer que são diferentes. */
